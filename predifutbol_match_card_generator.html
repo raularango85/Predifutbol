@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrediFutbol Match Card Generator</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for Sports HUD Aesthetic -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600;800;900&family=Teko:wght@600;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            bebas: ['"Bebas Neue"', 'sans-serif'],
+            teko: ['"Teko"', 'sans-serif'],
+            sans: ['"Inter"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              emerald: '#10B981',
+              cyan: '#06B6D4',
+              violet: '#8B5CF6',
+              accent: '#38BDF8',
+              card: 'rgba(15, 23, 42, 0.85)',
+              gold: '#F59E0B'
+            }
+          },
+          boxShadow: {
+            'glow-emerald': '0 0 25px -5px rgba(16, 185, 129, 0.4)',
+            'glow-cyan': '0 0 25px -5px rgba(6, 182, 212, 0.4)',
+            'glow-card': '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 1px 1px rgba(255, 255, 255, 0.1)',
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { opacity: '0.6', transform: 'scale(1)' },
+              '50%': { opacity: '1', transform: 'scale(1.03)' },
+            },
+            shimmer: {
+              '0%': { transform: 'translateX(-100%)' },
+              '100%': { transform: 'translateX(200%)' }
+            }
+          },
+          animation: {
+            'pulse-glow': 'pulseGlow 3s ease-in-out infinite',
+            'shimmer': 'shimmer 2.5s infinite',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090d16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+    
+    .glass-card {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .glass-pill {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .shimmer-effect {
+      position: relative;
+      overflow: hidden;
+    }
+    .shimmer-effect::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(
+        60deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.05) 50%,
+        transparent 70%
+      );
+      transform: rotate(30deg);
+      animation: shimmer 4s infinite;
+    }
+
+    /* Animation utility states */
+    .anim-hidden {
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .anim-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+
+<body class="h-full bg-slate-950 font-sans antialiased overflow-x-hidden text-slate-200">
+
+  <div class="min-h-screen flex flex-col">
+    <!-- Top Header -->
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-3 flex items-center justify-between z-20">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <i data-lucide="zap" class="w-5 h-5 text-slate-950 fill-slate-950"></i>
+        </div>
+        <div>
+          <h1 class="font-bebas text-2xl tracking-wide bg-gradient-to-r from-white via-slate-200 to-emerald-400 bg-clip-text text-transparent leading-none">
+            PREDIFUTBOL
+          </h1>
+          <p class="text-xs text-slate-400 font-medium tracking-wider uppercase">Match Card Generator</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <button id="preset-btn-1" onclick="loadPreset('pl')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition flex items-center gap-1.5 border border-slate-700/50">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-400"></i> Preset: Liverpool vs Arsenal
+        </button>
+        <button id="preset-btn-2" onclick="loadPreset('clasico')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition flex items-center gap-1.5 border border-slate-700/50">
+          <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-400"></i> Preset: El Clásico
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 md:p-6 max-w-7xl mx-auto w-full items-start">
+
+      <!-- LEFT: Editor Form Controls -->
+      <section class="lg:col-span-6 xl:col-span-5 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 backdrop-blur shadow-xl space-y-6">
+        
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="sliders" class="w-5 h-5 text-emerald-400"></i>
+            <h2 class="font-bold text-lg text-white">Card Content & Data</h2>
+          </div>
+          <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono">9:16 Format</span>
+        </div>
+
+        <form id="card-form" onsubmit="event.preventDefault();" class="space-y-4 text-xs">
+
+          <!-- League & Competition -->
+          <div>
+            <label class="block text-slate-400 font-semibold mb-1">League / Tournament</label>
+            <input type="text" id="input-league" value="PREMIER LEAGUE" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-emerald-500 font-semibold tracking-wider">
+          </div>
+
+          <!-- Teams Section -->
+          <div class="grid grid-cols-2 gap-3 bg-slate-950/50 p-3 rounded-xl border border-slate-800/50">
+            <!-- Home Team -->
+            <div class="space-y-2">
+              <span class="text-emerald-400 font-bold uppercase tracking-wider text-[10px]">Home Team</span>
+              <div>
+                <label class="text-slate-400 block mb-0.5">Name</label>
+                <input type="text" id="input-home-name" value="LIVERPOOL" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 font-bold">
+              </div>
+              <div>
+                <label class="text-slate-400 block mb-0.5">Flag / Logo URL or Emoji</label>
+                <input type="text" id="input-home-flag" value="🏴󠁧󠁢󠁥󠁮󠁧󠁿" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5">
+              </div>
+            </div>
+
+            <!-- Away Team -->
+            <div class="space-y-2">
+              <span class="text-cyan-400 font-bold uppercase tracking-wider text-[10px]">Away Team</span>
+              <div>
+                <label class="text-slate-400 block mb-0.5">Name</label>
+                <input type="text" id="input-away-name" value="ARSENAL" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 font-bold">
+              </div>
+              <div>
+                <label class="text-slate-400 block mb-0.5">Flag / Logo URL or Emoji</label>
+                <input type="text" id="input-away-flag" value="🏴󠁧󠁢󠁥󠁮󠁧󠁿" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5">
+              </div>
+            </div>
+          </div>
+
+          <!-- Stadium & Date -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Stadium / Venue</label>
+              <input type="text" id="input-stadium" value="Anfield, Liverpool" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Date & Time</label>
+              <input type="text" id="input-date" value="SAT, NOV 8 • 17:30 GMT" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+            </div>
+          </div>
+
+          <!-- Dynamic Stats Box -->
+          <div class="bg-slate-950/50 p-3 rounded-xl border border-slate-800/50 space-y-2">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-slate-300 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+                <i data-lucide="bar-chart-2" class="w-3 h-3 text-emerald-400"></i> Match Stats & Facts (3 Lines)
+              </span>
+            </div>
+            <div>
+              <input type="text" id="input-stat-1" value="⚡ H2H: Both teams scored in 4 of last 5 games" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200">
+            </div>
+            <div>
+              <input type="text" id="input-stat-2" value="🔥 Home Form: Liverpool avg 2.4 goals / match" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200">
+            </div>
+            <div>
+              <input type="text" id="input-stat-3" value="🛡️ Away Form: Arsenal scored in 90% of away games" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-slate-200">
+            </div>
+          </div>
+
+          <!-- Prediction Box -->
+          <div class="bg-emerald-950/20 border border-emerald-500/20 p-3.5 rounded-xl space-y-3">
+            <span class="text-emerald-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
+              <i data-lucide="target" class="w-3.5 h-3.5"></i> Prediction Pick & Confidence
+            </span>
+            <div>
+              <label class="block text-slate-400 mb-1">Pick / Market</label>
+              <input type="text" id="input-prediction" value="BOTH TEAMS TO SCORE (BTTS)" class="w-full bg-slate-950 border border-emerald-500/40 rounded-lg px-3 py-2 font-bold text-emerald-300">
+            </div>
+            <div>
+              <div class="flex justify-between text-slate-300 font-semibold mb-1">
+                <span>Probability / Confidence Rate</span>
+                <span id="confidence-val-display" class="text-emerald-400 font-mono font-bold">65%</span>
+              </div>
+              <input type="range" id="input-confidence" min="10" max="99" value="65" class="w-full accent-emerald-500 cursor-pointer">
+            </div>
+          </div>
+
+          <!-- Theme Accent Color -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+            <span class="text-slate-400 font-semibold">Card Accent Theme</span>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="setTheme('emerald')" class="w-6 h-6 rounded-full bg-emerald-500 ring-2 ring-slate-800 hover:scale-110 transition"></button>
+              <button type="button" onclick="setTheme('cyan')" class="w-6 h-6 rounded-full bg-cyan-500 ring-2 ring-slate-800 hover:scale-110 transition"></button>
+              <button type="button" onclick="setTheme('violet')" class="w-6 h-6 rounded-full bg-violet-500 ring-2 ring-slate-800 hover:scale-110 transition"></button>
+              <button type="button" onclick="setTheme('amber')" class="w-6 h-6 rounded-full bg-amber-500 ring-2 ring-slate-800 hover:scale-110 transition"></button>
+            </div>
+          </div>
+
+        </form>
+      </section>
+
+      <!-- RIGHT: Interactive 9:16 Video Preview Canvas -->
+      <section class="lg:col-span-6 xl:col-span-7 flex flex-col items-center justify-center space-y-4">
+        
+        <!-- Controls Bar -->
+        <div class="w-full max-w-[380px] bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between backdrop-blur shadow-md">
+          <div class="flex items-center gap-2">
+            <button id="btn-play" onclick="triggerAnimationSequence()" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-500/20">
+              <i data-lucide="play" class="w-3.5 h-3.5 fill-slate-950"></i> Replay Motion
+            </button>
+            <span id="status-tag" class="text-[11px] font-mono text-slate-400 px-2 py-0.5 rounded bg-slate-800">Ready</span>
+          </div>
+
+          <div class="text-[11px] text-slate-400 font-mono">
+            1080 x 1920 (9:16)
+          </div>
+        </div>
+
+        <!-- 9:16 Video Card Container (Frame Mockup) -->
+        <div class="relative w-full max-w-[380px] aspect-[9/16] bg-slate-950 rounded-3xl border-4 border-slate-800 shadow-glow-card overflow-hidden flex flex-col justify-between p-6 select-none shimmer-effect">
+          
+          <!-- Background Glow Elements -->
+          <div id="glow-bg-1" class="absolute -top-24 -left-24 w-60 h-60 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none transition-all duration-700"></div>
+          <div id="glow-bg-2" class="absolute -bottom-24 -right-24 w-60 h-60 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none transition-all duration-700"></div>
+
+          <!-- Grid Overlay Pattern for HUD feel -->
+          <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] opacity-40 pointer-events-none"></div>
+
+          <!-- HEADER / BRANDING -->
+          <div id="anim-header" class="relative z-10 flex items-center justify-between border-b border-slate-800/80 pb-3 anim-hidden">
+            <div class="flex items-center gap-2">
+              <div id="accent-logo-bg" class="w-7 h-7 rounded-lg bg-emerald-500 flex items-center justify-center shadow-md">
+                <i data-lucide="zap" class="w-4 h-4 text-slate-950 fill-slate-950"></i>
+              </div>
+              <span class="font-bebas text-xl tracking-wider text-white">PREDIFUTBOL</span>
+            </div>
+            <span id="card-league-badge" class="glass-pill px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-widest text-emerald-400 border border-emerald-500/30 uppercase">
+              PREMIER LEAGUE
+            </span>
+          </div>
+
+          <!-- CENTRAL TRADING CARD CONTAINER -->
+          <div class="relative z-10 my-auto space-y-4">
+            
+            <!-- MAIN MATCHUP CARD -->
+            <div id="anim-card" class="glass-card rounded-2xl p-4 shadow-2xl relative overflow-hidden anim-hidden">
+              <div id="accent-card-border" class="absolute inset-0 border-2 border-emerald-500/30 rounded-2xl pointer-events-none"></div>
+
+              <!-- Match Venue & Date Banner -->
+              <div class="text-center pb-3 border-b border-slate-800/60">
+                <p id="card-stadium" class="text-[11px] font-medium text-slate-300">Anfield, Liverpool</p>
+                <p id="card-date" class="text-[9px] font-mono text-slate-400 tracking-wider">SAT, NOV 8 • 17:30 GMT</p>
+              </div>
+
+              <!-- Match Teams & Flags HUD -->
+              <div class="grid grid-cols-5 items-center py-4 text-center">
+                
+                <!-- Home Team -->
+                <div class="col-span-2 flex flex-col items-center space-y-1.5">
+                  <div id="card-home-flag-box" class="w-14 h-14 rounded-2xl glass-pill flex items-center justify-center text-3xl shadow-inner border border-white/10 transform transition duration-500 hover:scale-105">
+                    <span id="card-home-flag">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span>
+                  </div>
+                  <span id="card-home-name" class="font-bebas text-lg tracking-wider text-white leading-tight">LIVERPOOL</span>
+                </div>
+
+                <!-- VS Badge -->
+                <div class="col-span-1 flex flex-col items-center">
+                  <div id="accent-vs-bg" class="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-cyan-500 text-slate-950 font-teko text-lg font-bold flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    VS
+                  </div>
+                </div>
+
+                <!-- Away Team -->
+                <div class="col-span-2 flex flex-col items-center space-y-1.5">
+                  <div id="card-away-flag-box" class="w-14 h-14 rounded-2xl glass-pill flex items-center justify-center text-3xl shadow-inner border border-white/10 transform transition duration-500 hover:scale-105">
+                    <span id="card-away-flag">🏴󠁧󠁢󠁥󠁮󠁧󠁿</span>
+                  </div>
+                  <span id="card-away-name" class="font-bebas text-lg tracking-wider text-white leading-tight">ARSENAL</span>
+                </div>
+
+              </div>
+
+              <!-- STATS & INSIGHTS BOX -->
+              <div id="anim-stats" class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80 space-y-1.5 text-[11px] text-slate-300 anim-hidden">
+                <div class="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  <i data-lucide="activity" class="w-3 h-3 text-emerald-400"></i> Key Match Data
+                </div>
+                <div id="card-stat-1" class="font-medium truncate">⚡ H2H: Both teams scored in 4 of last 5 games</div>
+                <div id="card-stat-2" class="font-medium truncate">🔥 Home Form: Liverpool avg 2.4 goals / match</div>
+                <div id="card-stat-3" class="font-medium truncate">🛡️ Away Form: Arsenal scored in 90% of away games</div>
+              </div>
+
+            </div>
+
+            <!-- PREDICTION & CONFIDENCE HUD BOX -->
+            <div id="anim-prediction" class="glass-card rounded-2xl p-4 shadow-xl border border-emerald-500/30 relative overflow-hidden anim-hidden">
+              <div class="flex justify-between items-center mb-1.5">
+                <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 flex items-center gap-1">
+                  <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i> Value Prediction
+                </span>
+                <span id="card-confidence-text" class="font-mono font-black text-sm text-emerald-400">0%</span>
+              </div>
+
+              <div id="card-prediction" class="font-bebas text-xl text-white tracking-wide mb-2.5">
+                BOTH TEAMS TO SCORE (BTTS)
+              </div>
+
+              <!-- Dynamic Meter Bar -->
+              <div class="w-full h-3 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800">
+                <div id="card-confidence-bar" class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-1000 ease-out" style="width: 0%"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- CARD FOOTER / CTA -->
+          <div id="anim-footer" class="relative z-10 text-center border-t border-slate-800/80 pt-3 anim-hidden">
+            <p class="text-[10px] font-semibold text-slate-400 tracking-widest uppercase flex items-center justify-center gap-1">
+              <i data-lucide="sparkles" class="w-3 h-3 text-emerald-400"></i> Follow @PrediFutbol for daily tips
+            </p>
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    // Presets
+    const PRESETS = {
+      pl: {
+        league: "PREMIER LEAGUE",
+        homeName: "LIVERPOOL",
+        homeFlag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+        awayName: "ARSENAL",
+        awayFlag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+        stadium: "Anfield, Liverpool",
+        date: "SAT, NOV 8 • 17:30 GMT",
+        stat1: "⚡ H2H: Both teams scored in 4 of last 5 games",
+        stat2: "🔥 Home Form: Liverpool avg 2.4 goals / match",
+        stat3: "🛡️ Away Form: Arsenal scored in 90% of away games",
+        prediction: "BOTH TEAMS TO SCORE (BTTS)",
+        confidence: 65,
+        theme: "emerald"
+      },
+      clasico: {
+        league: "EL CLÁSICO • LA LIGA",
+        homeName: "REAL MADRID",
+        homeFlag: "🇪🇸",
+        awayName: "BARCELONA",
+        awayFlag: "🇪🇸",
+        stadium: "Santiago Bernabéu, Madrid",
+        date: "SUN, NOV 16 • 20:00 CET",
+        stat1: "⚽ Over 2.5 goals in 8 of last 10 Clásicos",
+        stat2: "⚡ Real Madrid unbeaten in last 12 home matches",
+        stat3: "🔥 Barca scored 2+ goals in 6 consecutive games",
+        prediction: "OVER 2.5 GOALS & BTTS",
+        confidence: 78,
+        theme: "amber"
+      }
+    };
+
+    // DOM Elements Map
+    const inputs = {
+      league: document.getElementById('input-league'),
+      homeName: document.getElementById('input-home-name'),
+      homeFlag: document.getElementById('input-home-flag'),
+      awayName: document.getElementById('input-away-name'),
+      awayFlag: document.getElementById('input-away-flag'),
+      stadium: document.getElementById('input-stadium'),
+      date: document.getElementById('input-date'),
+      stat1: document.getElementById('input-stat-1'),
+      stat2: document.getElementById('input-stat-2'),
+      stat3: document.getElementById('input-stat-3'),
+      prediction: document.getElementById('input-prediction'),
+      confidence: document.getElementById('input-confidence'),
+      confidenceDisplay: document.getElementById('confidence-val-display')
+    };
+
+    const card = {
+      league: document.getElementById('card-league-badge'),
+      homeName: document.getElementById('card-home-name'),
+      homeFlag: document.getElementById('card-home-flag'),
+      awayName: document.getElementById('card-away-name'),
+      awayFlag: document.getElementById('card-away-flag'),
+      stadium: document.getElementById('card-stadium'),
+      date: document.getElementById('card-date'),
+      stat1: document.getElementById('card-stat-1'),
+      stat2: document.getElementById('card-stat-2'),
+      stat3: document.getElementById('card-stat-3'),
+      prediction: document.getElementById('card-prediction'),
+      confidenceBar: document.getElementById('card-confidence-bar'),
+      confidenceText: document.getElementById('card-confidence-text')
+    };
+
+    // Color Themes Configuration
+    const THEMES = {
+      emerald: {
+        primary: 'emerald',
+        badge: 'text-emerald-400 border-emerald-500/30',
+        bar: 'from-emerald-500 to-cyan-400',
+        border: 'border-emerald-500/30',
+        logoBg: 'bg-emerald-500',
+        glow1: 'bg-emerald-500/20',
+        glow2: 'bg-cyan-500/20'
+      },
+      cyan: {
+        primary: 'cyan',
+        badge: 'text-cyan-400 border-cyan-500/30',
+        bar: 'from-cyan-500 to-blue-500',
+        border: 'border-cyan-500/30',
+        logoBg: 'bg-cyan-500',
+        glow1: 'bg-cyan-500/20',
+        glow2: 'bg-blue-500/20'
+      },
+      violet: {
+        primary: 'violet',
+        badge: 'text-violet-400 border-violet-500/30',
+        bar: 'from-violet-500 to-fuchsia-500',
+        border: 'border-violet-500/30',
+        logoBg: 'bg-violet-500',
+        glow1: 'bg-violet-500/20',
+        glow2: 'bg-fuchsia-500/20'
+      },
+      amber: {
+        primary: 'amber',
+        badge: 'text-amber-400 border-amber-500/30',
+        bar: 'from-amber-500 to-red-500',
+        border: 'border-amber-500/30',
+        logoBg: 'bg-amber-500',
+        glow1: 'bg-amber-500/20',
+        glow2: 'bg-red-500/20'
+      }
+    };
+
+    let currentTheme = 'emerald';
+
+    // Synchronize Form to Preview Card
+    function updateCardFromInputs() {
+      card.league.textContent = inputs.league.value.toUpperCase();
+      card.homeName.textContent = inputs.homeName.value.toUpperCase();
+      card.awayName.textContent = inputs.awayName.value.toUpperCase();
+      
+      // Render flag images or emojis
+      renderFlag(inputs.homeFlag.value, card.homeFlag);
+      renderFlag(inputs.awayFlag.value, card.awayFlag);
+
+      card.stadium.textContent = inputs.stadium.value;
+      card.date.textContent = inputs.date.value.toUpperCase();
+      
+      card.stat1.textContent = inputs.stat1.value;
+      card.stat2.textContent = inputs.stat2.value;
+      card.stat3.textContent = inputs.stat3.value;
+      
+      card.prediction.textContent = inputs.prediction.value.toUpperCase();
+      inputs.confidenceDisplay.textContent = inputs.confidence.value + '%';
+    }
+
+    function renderFlag(val, element) {
+      if (val.startsWith('http://') || val.startsWith('https://')) {
+        element.innerHTML = `<img src="${val}" class="w-10 h-10 object-contain rounded" alt="flag">`;
+      } else {
+        element.textContent = val || '⚽';
+      }
+    }
+
+    // Theme Switcher
+    function setTheme(themeKey) {
+      currentTheme = themeKey;
+      const theme = THEMES[themeKey];
+
+      document.getElementById('accent-logo-bg').className = `w-7 h-7 rounded-lg ${theme.logoBg} flex items-center justify-center shadow-md`;
+      document.getElementById('accent-card-border').className = `absolute inset-0 border-2 ${theme.border} rounded-2xl pointer-events-none`;
+      card.confidenceBar.className = `h-full rounded-full bg-gradient-to-r ${theme.bar} transition-all duration-1000 ease-out`;
+      card.confidenceText.className = `font-mono font-black text-sm text-${theme.primary}-400`;
+      
+      document.getElementById('glow-bg-1').className = `absolute -top-24 -left-24 w-60 h-60 ${theme.glow1} rounded-full blur-3xl pointer-events-none transition-all duration-700`;
+      document.getElementById('glow-bg-2').className = `absolute -bottom-24 -right-24 w-60 h-60 ${theme.glow2} rounded-full blur-3xl pointer-events-none transition-all duration-700`;
+    }
+
+    // Load Presets
+    function loadPreset(key) {
+      const data = PRESETS[key];
+      if (!data) return;
+
+      inputs.league.value = data.league;
+      inputs.homeName.value = data.homeName;
+      inputs.homeFlag.value = data.homeFlag;
+      inputs.awayName.value = data.awayName;
+      inputs.awayFlag.value = data.awayFlag;
+      inputs.stadium.value = data.stadium;
+      inputs.date.value = data.date;
+      inputs.stat1.value = data.stat1;
+      inputs.stat2.value = data.stat2;
+      inputs.stat3.value = data.stat3;
+      inputs.prediction.value = data.prediction;
+      inputs.confidence.value = data.confidence;
+
+      setTheme(data.theme);
+      updateCardFromInputs();
+      triggerAnimationSequence();
+    }
+
+    // 5-Second Video Motion Preview Simulation
+    function triggerAnimationSequence() {
+      const elements = [
+        document.getElementById('anim-header'),
+        document.getElementById('anim-card'),
+        document.getElementById('anim-stats'),
+        document.getElementById('anim-prediction'),
+        document.getElementById('anim-footer')
+      ];
+
+      const statusTag = document.getElementById('status-tag');
+      statusTag.textContent = "Rendering Motion...";
+      statusTag.className = "text-[11px] font-mono text-emerald-400 px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/30";
+
+      // Reset
+      elements.forEach(el => el.classList.remove('anim-visible'));
+      card.confidenceBar.style.width = '0%';
+      card.confidenceText.textContent = '0%';
+
+      // Timed Staggered Animation
+      setTimeout(() => elements[0].classList.add('anim-visible'), 100);
+      setTimeout(() => elements[1].classList.add('anim-visible'), 300);
+      setTimeout(() => elements[2].classList.add('anim-visible'), 600);
+      setTimeout(() => elements[3].classList.add('anim-visible'), 900);
+      
+      // Animate Confidence Counter & Gauge
+      setTimeout(() => {
+        const targetConf = parseInt(inputs.confidence.value, 10);
+        card.confidenceBar.style.width = targetConf + '%';
+
+        let current = 0;
+        const duration = 1000;
+        const stepTime = 20;
+        const steps = duration / stepTime;
+        const increment = targetConf / steps;
+
+        const timer = setInterval(() => {
+          current += increment;
+          if (current >= targetConf) {
+            current = targetConf;
+            clearInterval(timer);
+          }
+          card.confidenceText.textContent = Math.round(current) + '%';
+        }, stepTime);
+
+      }, 1100);
+
+      setTimeout(() => elements[4].classList.add('anim-visible'), 1400);
+
+      setTimeout(() => {
+        statusTag.textContent = "Preview Ready";
+        statusTag.className = "text-[11px] font-mono text-slate-400 px-2 py-0.5 rounded bg-slate-800";
+      }, 2500);
+    }
+
+    // Attach Event Listeners
+    Object.values(inputs).forEach(input => {
+      input.addEventListener('input', updateCardFromInputs);
+    });
+
+    // Initialization
+    window.onload = function() {
+      lucide.createIcons();
+      updateCardFromInputs();
+      triggerAnimationSequence();
+    };
+  </script>
+</body>
+</html>
