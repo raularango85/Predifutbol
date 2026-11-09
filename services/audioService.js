@@ -136,13 +136,13 @@ function buildNarrationText(cardData, lang = 'es') {
     return (
       `¡${home} recibe a ${away}! ` +
       `Nuestra predicción de valor: ${pick}, a cuota ${oddStr} y ${prob} por ciento de probabilidad. ` +
-      `¡Síguenos en TikTok!`
+      `¡Síguenos en TikTok... ¡Somos PrediFutbol Colombia!`
     );
   } else {
     return (
       `¡${home} takes on ${away}! ` +
       `Our top value pick: ${pick}, at odds ${oddStr} with ${prob} percent confidence. ` +
-      `Follow us on TikTok!`
+      `Follow us on TikTok... We are PrediFutbol Colombia!`
     );
   }
 }
@@ -152,8 +152,8 @@ function buildNarrationText(cardData, lang = 'es') {
  */
 async function generateSpeech({ text, lang = 'es', voice = null, outputPath }) {
   const chosenVoice = voice || (lang === 'es' ? 'es-CO-GonzaloNeural' : 'en-US-ChristopherNeural');
-  // +15% rate delivers energetic sports tempo and fits comfortably in 10-11s
-  const rate = '+15%';
+  // +18% rate delivers punchy sports tempo and fits in ~12.2s leaving 2.5s outro
+  const rate = '+18%';
 
   try {
     execFileSync('python', [
@@ -198,11 +198,11 @@ async function mixVideoAudioTrack({ cardData, lang = 'es', durationSec = 15, out
     const bgmSource = fs.existsSync(BGM_CROWD) ? BGM_CROWD : BGM_BEAT;
     const isCrowd = bgmSource === BGM_CROWD;
 
-    // When commentator speaks (0.5s - 11.2s), duck crowd volume to 0.18.
+    // When commentator speaks (0.4s - 12.8s), duck crowd volume to 0.18.
     // In intro and outro, crowd roar rises to 0.42 for stadium energy.
     const bgmFilter = isCrowd
-      ? `volume='if(between(t,0.5,11.2), 0.18, 0.42)':eval=frame,afade=t=out:st=${Math.max(1, durationSec - 1.5)}:d=1.5[bg]`
-      : `volume=0.35,afade=t=out:st=${Math.max(1, durationSec - 1.5)}:d=1.5[bg]`;
+      ? `volume='if(between(t,0.4,12.8), 0.18, 0.42)':eval=frame,afade=t=out:st=${Math.max(1, durationSec - 1.2)}:d=1.2[bg]`
+      : `volume=0.35,afade=t=out:st=${Math.max(1, durationSec - 1.2)}:d=1.2[bg]`;
 
     if (hasVoice && fs.existsSync(tempNarration) && fs.existsSync(bgmSource) && fs.existsSync(SFX_WHOOSH) && fs.existsSync(SFX_DING)) {
       // Full Mix: Commentator Voice + Stadium Crowd (ducked) + Whoosh + Ding
@@ -213,7 +213,7 @@ async function mixVideoAudioTrack({ cardData, lang = 'es', durationSec = 15, out
         '-i', SFX_WHOOSH,
         '-i', SFX_DING,
         '-filter_complex',
-        `[0:a]adelay=500|500,volume=1.35[v];` +
+        `[0:a]adelay=400|400,volume=1.35[v];` +
         `[1:a]${bgmFilter};` +
         `[2:a]adelay=0|0,volume=0.65[w];` +
         `[3:a]adelay=5500|5500,volume=0.75[d];` +
