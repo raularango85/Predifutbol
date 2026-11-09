@@ -24,7 +24,9 @@ try {
 const AUDIO_DIR = path.join(__dirname, '..', 'public', 'audio');
 const SFX_WHOOSH = path.join(AUDIO_DIR, 'sfx_whoosh.mp3');
 const SFX_DING = path.join(AUDIO_DIR, 'sfx_ding.mp3');
+const BGM_CROWD = path.join(AUDIO_DIR, 'bgm_stadium_crowd.mp3');
 const BGM_BEAT = path.join(AUDIO_DIR, 'bgm_sport_beat.mp3');
+const ROOT_CROWD_WAV = path.join(__dirname, '..', '654083__dan_audiofile__football-match_crowd_cheer_ambience-stereo.wav');
 
 function ensureAudioDir() {
   if (!fs.existsSync(AUDIO_DIR)) {
@@ -33,11 +35,28 @@ function ensureAudioDir() {
 }
 
 /**
- * Ensure the base SFX and BGM files exist; synthesize them if missing.
+ * Ensure the base SFX, stadium crowd, and BGM files exist; synthesize or convert if missing.
  */
 function ensureBaseAudioAssets() {
   ensureAudioDir();
   if (!ffmpegStaticPath || !fs.existsSync(ffmpegStaticPath)) return;
+
+  // Authentic 15s Stadium Crowd Ambience
+  if (!fs.existsSync(BGM_CROWD) && fs.existsSync(ROOT_CROWD_WAV)) {
+    try {
+      execFileSync(ffmpegStaticPath, [
+        '-y',
+        '-stream_loop', '2',
+        '-i', ROOT_CROWD_WAV,
+        '-t', '15',
+        '-af', 'afade=t=in:ss=0:d=0.5,afade=t=out:st=13.5:d=1.5',
+        '-b:a', '192k',
+        BGM_CROWD
+      ]);
+    } catch (e) {
+      console.warn('Could not generate bgm_stadium_crowd.mp3:', e.message);
+    }
+  }
 
   if (!fs.existsSync(SFX_WHOOSH)) {
     try {
@@ -176,31 +195,40 @@ async function mixVideoAudioTrack({ cardData, lang = 'es', durationSec = 15, out
   }
 
   try {
-    if (hasVoice && fs.existsSync(tempNarration) && fs.existsSync(BGM_BEAT) && fs.existsSync(SFX_WHOOSH) && fs.existsSync(SFX_DING)) {
-      // Full Mix: Voice + Beat + Whoosh + Ding
+    const bgmSource = fs.existsSync(BGM_CROWD) ? BGM_CROWD : BGM_BEAT;
+    const isCrowd = bgmSource === BGM_CROWD;
+
+    // When commentator speaks (0.5s - 11.2s), duck crowd volume to 0.18.
+    // In intro and outro, crowd roar rises to 0.42 for stadium energy.
+    const bgmFilter = isCrowd
+      ? `volume='if(between(t,0.5,11.2), 0.18, 0.42)':eval=frame,afade=t=out:st=${Math.max(1, durationSec - 1.5)}:d=1.5[bg]`
+      : `volume=0.35,afade=t=out:st=${Math.max(1, durationSec - 1.5)}:d=1.5[bg]`;
+
+    if (hasVoice && fs.existsSync(tempNarration) && fs.existsSync(bgmSource) && fs.existsSync(SFX_WHOOSH) && fs.existsSync(SFX_DING)) {
+      // Full Mix: Commentator Voice + Stadium Crowd (ducked) + Whoosh + Ding
       execFileSync(ffmpegStaticPath, [
         '-y',
         '-i', tempNarration,
-        '-i', BGM_BEAT,
+        '-i', bgmSource,
         '-i', SFX_WHOOSH,
         '-i', SFX_DING,
         '-filter_complex',
-        `[0:a]adelay=500|500,volume=1.25[v];` +
-        `[1:a]volume=0.35,afade=t=out:st=${Math.max(1, durationSec - 1.5)}:d=1.5[bg];` +
-        `[2:a]adelay=0|0,volume=0.7[w];` +
-        `[3:a]adelay=5500|5500,volume=0.8[d];` +
+        `[0:a]adelay=500|500,volume=1.35[v];` +
+        `[1:a]${bgmFilter};` +
+        `[2:a]adelay=0|0,volume=0.65[w];` +
+        `[3:a]adelay=5500|5500,volume=0.75[d];` +
         `[v][bg][w][d]amix=inputs=4:duration=longest:dropout_transition=2[outa]`,
         '-map', '[outa]',
         '-t', String(durationSec),
         '-b:a', '192k',
         outputPath
       ]);
-    } else if (fs.existsSync(BGM_BEAT)) {
-      // Fallback: Beat only
+    } else if (fs.existsSync(bgmSource)) {
+      // Fallback: Background only
       execFileSync(ffmpegStaticPath, [
         '-y',
-        '-i', BGM_BEAT,
-        '-af', `afade=t=out:st=${Math.max(1, durationSec - 1.5)}:d=1.5`,
+        '-i', bgmSource,
+        '-af', `volume=${isCrowd ? '0.45' : '0.40'},afade=t=out:st=${Math.max(1, durationSec - 1.5)}:d=1.5`,
         '-t', String(durationSec),
         '-b:a', '192k',
         outputPath

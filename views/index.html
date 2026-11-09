@@ -486,8 +486,8 @@
             <div class="flex items-center gap-2">
               <span class="text-lg">🔥</span>
               <div>
-                <h3 class="font-bold text-white text-sm">Mezcla Completa (Voz + Beat Deportivo + Efectos)</h3>
-                <p class="text-slate-400 text-[11px]">Simulación del audio final del video de 15s con narrador colombiano, ritmo de fondo y efectos sincronizados</p>
+                <h3 class="font-bold text-white text-sm">Mezcla Completa (Voz + Hinchada en Estadio + Efectos)</h3>
+                <p class="text-slate-400 text-[11px]">Simulación del audio final de 15s: narrador colombiano, sonido ambiente de estadio con atenuación inteligente y efectos sincronizados</p>
               </div>
             </div>
             <span class="text-[10px] font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30">15 segundos</span>
@@ -546,10 +546,15 @@
         <div>
           <div class="flex items-center gap-2 mb-2">
             <i data-lucide="music" class="w-4 h-4 text-cyan-400"></i>
-            <h3 class="font-bold text-slate-200 text-xs uppercase tracking-wider">Efectos de Sonido y Fondo</h3>
+            <h3 class="font-bold text-slate-200 text-xs uppercase tracking-wider">Sonidos de Fondo y Efectos</h3>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
             
+            <div class="bg-slate-950/60 border border-emerald-500/30 rounded-xl p-2.5">
+              <div class="font-bold text-emerald-400 text-[11px] mb-1">🏟️ Estadio Real (Hinchada)</div>
+              <audio controls class="w-full h-8" src="/public/audio/bgm_stadium_crowd.mp3"></audio>
+            </div>
+
             <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5">
               <div class="font-bold text-slate-300 text-[11px] mb-1">🥁 Beat Rítmico (15s)</div>
               <audio controls class="w-full h-8" src="/public/audio/bgm_sport_beat.mp3"></audio>
