@@ -22,7 +22,7 @@
     "market_value": "Valor de Apuesta",
     "custom_pick": "Texto del Pronóstico (Auto o Manual)",
     "odd_input": "Cuota Aproximada",
-    "stake_input": "Stake (1-10)",
+    "stake_input": "Nivel de Confianza (1-10)",
     "confidence_rate": "Probabilidad / Confianza",
     "theme_label": "Color del Tema",
     "save_card": "Guardar Tarjeta",
@@ -36,7 +36,7 @@
     "key_match_data": "Datos Clave del Partido",
     "value_prediction": "Predicción de Valor",
     "odd_badge": "CUOTA",
-    "stake_badge": "STAKE",
+    "stake_badge": "CONFIANZA",
     "cta_footer": "Síguenos en TikTok @predifutbolcolombia"
   },
   "markets": {

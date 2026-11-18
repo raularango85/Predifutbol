@@ -50,3 +50,19 @@ ehthumbs.db
 scratch/
 *.tmp
 *.temp
+
+# 7. Go & Executable Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/predifutbol_server.exe
+/backend/bin/
+
+# 8. Frontend Builds
+frontend/node_modules/
+frontend/dist/
+
+# 9. Test Media Files
+test_*

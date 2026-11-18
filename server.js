@@ -11,10 +11,12 @@ const express = require('express');
 const cors = require('cors');
 const db = require('./services/db');
 const apiFootball = require('./services/apiFootball');
+const tiktokService = require('./services/tiktokService');
+const predictionsChecker = require('./services/predictionsChecker');
 const { exportCardAssets } = require('./renderer');
 
 const app = express();
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 3001);
 
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
@@ -83,7 +85,8 @@ app.get('/api/fixtures', async (req, res) => {
     const q = req.query.q || '';
     const date = req.query.date || '';
     const limit = req.query.limit || 30;
-    const fixtures = await db.searchFixtures({ q, date, limit });
+    const upcomingOnly = req.query.upcomingOnly !== 'false' && req.query.upcomingOnly !== '0';
+    const fixtures = await db.searchFixtures({ q, date, limit, upcomingOnly });
     res.json({ results: fixtures });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -146,6 +149,36 @@ app.delete('/api/predictions/:id', async (req, res) => {
   }
 });
 
+// Dynamic TikTok Copy & Hashtags generator
+app.post('/api/tiktok/generate', (req, res) => {
+  try {
+    const data = tiktokService.generateTikTokContent(req.body);
+    res.json({ success: true, ...data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Predictions Checker Service (port of legacy Yii2 Cron `cron/predictions-checker`)
+app.post('/api/predictions/check-all', async (req, res) => {
+  try {
+    const summary = await predictionsChecker.checkAllPendingPredictions();
+    res.json({ success: true, summary });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Settle / Verify a single prediction manually
+app.post('/api/predictions/:id/settle', async (req, res) => {
+  try {
+    const result = await predictionsChecker.settleSinglePrediction(req.params.id, req.body);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Export jobs (1080x1920 PNG or frame-by-frame MP4 via Playwright)
 // Exports run in the background; the UI polls /api/export/jobs/:id for progress.
@@ -154,7 +187,12 @@ const exportJobs = new Map();
 let activeExportJobId = null;
 
 function loadRenderer() {
-  delete require.cache[require.resolve('./renderer')];
+  try {
+    delete require.cache[require.resolve('./renderer')];
+    delete require.cache[require.resolve('./services/audioService')];
+    delete require.cache[require.resolve('./services/marketFormatter')];
+    delete require.cache[require.resolve('./services/tiktokService')];
+  } catch (e) {}
   return require('./renderer');
 }
 

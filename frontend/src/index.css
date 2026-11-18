@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  }
+}
+
+.font-bebas {
+  font-family: 'Bebas Neue', cursive, sans-serif;
+}
+
+.font-teko {
+  font-family: 'Teko', sans-serif;
+}
+
+.glass-card {
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-pill {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%) rotate(25deg); }
+  100% { transform: translateX(100%) rotate(25deg); }
+}
+
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-effect::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(60deg, transparent 40%, rgba(255, 255, 255, 0.08) 50%, transparent 60%);
+  transform: rotate(25deg);
+  animation: shimmer 5s infinite;
+  pointer-events: none;
+}
+
+@keyframes introAuraSpin {
+  0% { transform: rotate(0deg) scale(1); opacity: 0.75; }
+  50% { transform: rotate(180deg) scale(1.1); opacity: 0.95; }
+  100% { transform: rotate(360deg) scale(1); opacity: 0.75; }
+}
+
+@keyframes introLogoFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.02); }
+}
+
+@keyframes introVsPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(16,185,129,0.5)); }
+  50% { transform: scale(1.12); filter: drop-shadow(0 0 16px rgba(6,182,212,0.9)); }
+}
+
+@keyframes introHomeSlide {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-3px); }
+}
+
+@keyframes introAwaySlide {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(3px); }
+}
+
+.intro-aura-anim {
+  animation: introAuraSpin 8s linear infinite;
+}
+
+.intro-logo-anim {
+  animation: introLogoFloat 3s ease-in-out infinite;
+}
+
+.intro-vs-anim {
+  animation: introVsPulse 1.8s ease-in-out infinite;
+}
+
+.intro-home-anim {
+  animation: introHomeSlide 2.8s ease-in-out infinite;
+}
+
+.intro-away-anim {
+  animation: introAwaySlide 2.8s ease-in-out infinite;
+}

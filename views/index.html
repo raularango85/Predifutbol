@@ -13,6 +13,7 @@
   <!-- Local Tailwind CSS & Lucide Icons -->
   <script src="/public/vendor/tailwindcss.js"></script>
   <script src="/public/vendor/lucide.js"></script>
+  <script src="/public/js/teamTranslator.js"></script>
 
   <script>
     tailwind.config = {
@@ -123,6 +124,9 @@
     html.render-mode #studio-main,
     html.render-mode #prediction-form-modal,
     html.render-mode #audio-lab-modal,
+    html.render-mode #tiktok-modal,
+    html.render-mode #checker-summary-modal,
+    html.render-mode #manual-settle-modal,
     html.render-mode #preview-modal-header,
     html.render-mode #preview-modal-footer,
     html.render-mode #preview-modal-backdrop,
@@ -131,6 +135,9 @@
     body.render-mode #studio-main,
     body.render-mode #prediction-form-modal,
     body.render-mode #audio-lab-modal,
+    body.render-mode #tiktok-modal,
+    body.render-mode #checker-summary-modal,
+    body.render-mode #manual-settle-modal,
     body.render-mode #preview-modal-header,
     body.render-mode #preview-modal-footer,
     body.render-mode #preview-modal-backdrop,
@@ -409,7 +416,7 @@
               </span>
               <div class="flex items-center gap-1 shrink-0">
                 <span id="card-odd-pill" class="glass-pill px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold text-slate-200 border border-slate-700/60 whitespace-nowrap">CUOTA 1.72</span>
-                <span id="card-stake-pill" class="glass-pill px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold text-slate-300 border border-slate-700/60 whitespace-nowrap">STAKE 8/10</span>
+                <span id="card-stake-pill" class="glass-pill px-2 py-0.5 rounded-lg text-[11px] font-mono font-bold text-slate-300 border border-slate-700/60 whitespace-nowrap">CONFIANZA 8/10</span>
                 <span id="card-confidence-text" class="font-mono font-black text-lg text-emerald-400 whitespace-nowrap ml-1">68%</span>
               </div>
             </div>
@@ -444,6 +451,10 @@
         <button type="button" onclick="exportAssets('png', [currentLang])" class="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition">
           <i data-lucide="camera" class="w-3.5 h-3.5 text-cyan-400"></i>
           <span>Exportar PNG</span>
+        </button>
+        <button type="button" onclick="openTikTokModalFromCurrentPreview()" class="col-span-2 w-full py-2 px-3 rounded-xl bg-slate-950 hover:bg-cyan-950/40 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-cyan-500/30 hover:border-cyan-400 transition">
+          <i data-lucide="hash" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Ver y Copiar Copy & Tags para TikTok</span>
         </button>
       </div>
 
@@ -586,6 +597,219 @@
   </div>
 
   <!-- ========================================================================= -->
+  <!-- 3.1.5. MODAL DEDICADO DE COPY & HASHTAGS PARA TIKTOK                      -->
+  <!-- ========================================================================= -->
+  <div id="tiktok-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+    <div onclick="closeTikTokModal()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"></div>
+    
+    <div class="relative z-10 bg-slate-900 border border-cyan-500/30 rounded-3xl shadow-2xl p-5 md:p-6 max-w-2xl w-full my-auto max-h-[92vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-emerald-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+            <i data-lucide="hash" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="font-bebas text-2xl tracking-wide text-white flex items-center gap-2">
+              <span>COPY & HASHTAGS PARA TIKTOK</span>
+              <span id="tiktok-modal-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Auto</span>
+            </h2>
+            <p id="tiktok-modal-subtitle" class="text-xs text-slate-400">Optimizado para retención, algoritmo de TikTok y comentarios</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeTikTokModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="overflow-y-auto pr-1 space-y-4 flex-1 text-xs">
+        <!-- 1-Click Master Button -->
+        <button type="button" id="btn-copy-tiktok-master" onclick="copyTikTokMaster()" class="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:opacity-95 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/20 transition transform active:scale-[0.98]">
+          <i data-lucide="clipboard-copy" class="w-4 h-4 fill-slate-950"></i>
+          <span id="btn-copy-tiktok-master-text">COPIAR TODO AL PORTAPAPELES (LISTO PARA TIKTOK)</span>
+        </button>
+
+        <!-- Description Box -->
+        <div class="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-300 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Descripción / Copy del Post</span>
+            </span>
+            <button type="button" onclick="copyElementText('tiktok-modal-caption', this)" class="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+              <i data-lucide="copy" class="w-3 h-3"></i> Copiar solo descripción
+            </button>
+          </div>
+          <textarea id="tiktok-modal-caption" rows="6" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-cyan-500 leading-relaxed"></textarea>
+        </div>
+
+        <!-- Hashtags Box -->
+        <div class="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-slate-300 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+              <i data-lucide="tag" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>Hashtags Recomendados</span>
+            </span>
+            <button type="button" onclick="copyElementText('tiktok-modal-hashtags', this)" class="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+              <i data-lucide="copy" class="w-3 h-3"></i> Copiar solo hashtags
+            </button>
+          </div>
+          <textarea id="tiktok-modal-hashtags" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-cyan-300 font-mono text-[11px] focus:outline-none focus:border-cyan-500"></textarea>
+        </div>
+
+        <!-- Pro Tips for TikTok Success -->
+        <div class="p-3 rounded-xl bg-slate-950 border border-cyan-500/20 text-[11px] text-slate-400 space-y-1">
+          <div class="font-bold text-cyan-300 flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3 h-3 text-cyan-400"></i>
+            <span>Tips para publicar tus 3-4 videos diarios:</span>
+          </div>
+          <p>• Pega este texto directamente en la descripción de TikTok al subir el video exportado.</p>
+          <p>• Fija tu propio comentario preguntando: <em class="text-slate-300">«¿Quién gana hoy? ¡Los leo a todos! 👇»</em></p>
+          <p>• Espacia las publicaciones (por ejemplo: mañana, mediodía, tarde y noche).</p>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between gap-2.5 pt-3 border-t border-slate-800 mt-3">
+        <span class="text-[11px] text-slate-500 font-mono">PrediFutbol • Motor TikTok IA</span>
+        <button type="button" onclick="closeTikTokModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold transition text-xs">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3.1.6. MODAL DE RESUMEN DE REVISIÓN DE RESULTADOS (CRON YII2)             -->
+  <!-- ========================================================================= -->
+  <div id="checker-summary-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+    <div onclick="closeCheckerSummaryModal()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"></div>
+    
+    <div class="relative z-10 bg-slate-900 border border-emerald-500/30 rounded-3xl shadow-2xl p-5 md:p-6 max-w-2xl w-full my-auto max-h-[92vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="font-bebas text-2xl tracking-wide text-white">REVISIÓN DE PREDICCIONES</h2>
+            <p class="text-xs text-slate-400">Servicio de verificación automática contra API-Football (Cron)</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeCheckerSummaryModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- KPI Summary Counters -->
+      <div class="grid grid-cols-4 gap-2 mb-4">
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+          <div id="kpi-total-checked" class="font-mono font-bold text-lg text-white">0</div>
+          <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Revisadas</div>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-xl border border-emerald-500/30 text-center">
+          <div id="kpi-won" class="font-mono font-bold text-lg text-emerald-400">0</div>
+          <div class="text-[10px] text-emerald-400/80 uppercase tracking-wider font-semibold">Acertadas</div>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-xl border border-rose-500/30 text-center">
+          <div id="kpi-lost" class="font-mono font-bold text-lg text-rose-400">0</div>
+          <div class="text-[10px] text-rose-400/80 uppercase tracking-wider font-semibold">Falladas</div>
+        </div>
+        <div class="bg-slate-950 p-3 rounded-xl border border-amber-500/30 text-center">
+          <div id="kpi-pending" class="font-mono font-bold text-lg text-amber-400">0</div>
+          <div class="text-[10px] text-amber-400/80 uppercase tracking-wider font-semibold">En Juego / Pend.</div>
+        </div>
+      </div>
+
+      <!-- Detail Results List -->
+      <div id="checker-results-list" class="overflow-y-auto pr-1 space-y-2 flex-1 text-xs max-h-72 divide-y divide-slate-800">
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between gap-2.5 pt-3 border-t border-slate-800 mt-4">
+        <span class="text-[11px] text-slate-500 font-mono">Motor de Verificación v2 • PrediFutbol</span>
+        <button type="button" onclick="closeCheckerSummaryModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold transition text-xs">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3.1.7. MODAL DE CALIFICACIÓN / MARCADOR MANUAL                             -->
+  <!-- ========================================================================= -->
+  <div id="manual-settle-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
+    <div onclick="closeManualSettleModal()" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity"></div>
+    
+    <div class="relative z-10 bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl p-5 md:p-6 max-w-md w-full my-auto flex flex-col">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <i data-lucide="award" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="font-bebas text-xl tracking-wider text-white">CALIFICAR PREDICCIÓN</h3>
+            <p id="settle-match-name" class="text-xs text-slate-400 font-semibold truncate max-w-[240px]"></p>
+          </div>
+        </div>
+        <button type="button" onclick="closeManualSettleModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <!-- Pick info -->
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+          <span class="text-[10px] text-slate-400 font-semibold block uppercase">Pick Pronosticado:</span>
+          <span id="settle-pick-text" class="text-sm font-bold text-emerald-400"></span>
+        </div>
+
+        <!-- Option A: Enter Final Score & Auto Evaluate -->
+        <div class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
+          <span class="text-slate-300 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1">
+            <i data-lucide="calculator" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Opción 1: Evaluar por Marcador Final</span>
+          </span>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label id="settle-home-label" class="block text-[10px] text-slate-400 truncate mb-1">Goles Local</label>
+              <input type="number" id="settle-home-goals" min="0" max="20" placeholder="0" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono font-bold text-white text-center text-sm">
+            </div>
+            <div>
+              <label id="settle-away-label" class="block text-[10px] text-slate-400 truncate mb-1">Goles Visitante</label>
+              <input type="number" id="settle-away-goals" min="0" max="20" placeholder="0" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono font-bold text-white text-center text-sm">
+            </div>
+          </div>
+          <button type="button" onclick="submitScoreSettle()" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-black text-xs hover:opacity-95 transition shadow-lg shadow-emerald-500/20">
+            Evaluar Regla y Guardar
+          </button>
+        </div>
+
+        <!-- Option B: Direct Outcome Buttons -->
+        <div class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800 space-y-2">
+          <span class="text-slate-300 font-bold uppercase tracking-wider text-[11px]">
+            Opción 2: Calificación Directa (1 Clic)
+          </span>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="submitDirectSettle(1)" class="py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 font-bold text-xs transition">
+              ✅ Acertada
+            </button>
+            <button type="button" onclick="submitDirectSettle(0)" class="py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 font-bold text-xs transition">
+              ❌ Fallada
+            </button>
+            <button type="button" onclick="submitDirectSettle(2)" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-bold text-xs transition">
+              ⏳ Pendiente
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
   <!-- 3. MODAL DE CREACIÓN / EDICIÓN DE PREDICCIÓN (Formulario Completo)        -->
   <!-- ========================================================================= -->
   <div id="prediction-form-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 overflow-y-auto">
@@ -614,17 +838,26 @@
 
         <!-- 1-Click Fixture Search & API Sync -->
         <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80 space-y-2">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
             <span class="text-emerald-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
               <i data-lucide="database" class="w-3 h-3"></i>
               <span>Carga Rápida de Partidos (API-Football / BD Yii2)</span>
             </span>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <button type="button" onclick="syncDateAndSearch(getLocalDateIso(0))" title="Sincronizar partidos de hoy" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 border border-slate-700 text-[10px] font-semibold text-slate-300 transition">Hoy</button>
+              <button type="button" onclick="syncDateAndSearch(getLocalDateIso(1))" title="Sincronizar partidos de mañana" class="px-2 py-0.5 rounded bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold transition">Mañana</button>
               <input type="date" id="sync-date-input" class="bg-slate-900 border border-slate-800 rounded px-2 py-0.5 text-[10px] text-slate-300">
               <button type="button" onclick="syncApiFixtures()" id="btn-sync-api" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-300 border border-slate-700 text-[10px] font-semibold transition flex items-center gap-1">
                 <i data-lucide="refresh-cw" class="w-2.5 h-2.5"></i> Sincronizar API
               </button>
             </div>
+          </div>
+          <div class="flex items-center justify-between gap-2 pt-0.5">
+            <label class="flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold cursor-pointer select-none bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30 hover:bg-emerald-950/70 transition" title="Filtrar automáticamente solo partidos con hora posterior a la actual">
+              <input type="checkbox" id="fixture-upcoming-only" checked onchange="searchFixturesAutocomplete(document.getElementById('fixture-search-input').value, true)" class="accent-emerald-500 rounded cursor-pointer">
+              <span>Solo partidos futuros (> hora actual)</span>
+            </label>
+            <span class="text-[9px] text-slate-500 italic">Oculta partidos finalizados</span>
           </div>
           <div class="relative">
             <input type="text" id="fixture-search-input" onfocus="searchFixturesAutocomplete(this.value, true)" oninput="searchFixturesAutocomplete(this.value, true)" placeholder="Escribe o haz clic para buscar partidos por equipo, liga o país..." class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-slate-200 focus:outline-none focus:border-emerald-500">
@@ -674,7 +907,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="sm:col-span-1">
             <label class="block text-slate-400 font-semibold mb-1">Estadio / Sede</label>
-            <input type="text" id="input-stadium" value="Anfield, Liverpool" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100">
+            <input type="text" id="input-stadium" oninput="updateCardFromInputs(); refreshFormTikTokContent(false);" value="Anfield, Liverpool" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100">
           </div>
           <div class="sm:col-span-1">
             <label class="block text-slate-400 font-semibold mb-1">Hora Exacta Partido (Control de edición)</label>
@@ -682,7 +915,7 @@
           </div>
           <div class="sm:col-span-1">
             <label class="block text-slate-400 font-semibold mb-1">Texto Fecha para Tarjeta</label>
-            <input type="text" id="input-date" value="SÁB, 8 NOV • 17:30 GMT" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100">
+            <input type="text" id="input-date" oninput="updateCardFromInputs()" value="SÁB, 8 NOV • 17:30 GMT" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100">
           </div>
         </div>
 
@@ -693,32 +926,35 @@
             <span>Mercado, Predicción y Cuota</span>
           </span>
 
-          <div class="grid grid-cols-3 gap-2">
-            <div class="col-span-2">
-              <label class="block text-slate-400 mb-1 text-[11px]">Tipo de Mercado (Yii2)</label>
-              <select id="input-market-type" onchange="onMarketTypeChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 font-semibold">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-400 mb-1 text-[11px] font-semibold">Tipo de Mercado (Yii2)</label>
+              <select id="input-market-type" onchange="onMarketTypeChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 font-semibold focus:outline-none focus:border-emerald-500">
               </select>
             </div>
-            <div class="col-span-1">
-              <label class="block text-slate-400 mb-1 text-[11px]">Valor del Pick</label>
-              <select id="input-market-value" onchange="onMarketValueChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-emerald-300 font-bold">
+            <div>
+              <label class="block text-slate-400 mb-1 text-[11px] font-semibold">Valor del Pick (Resultado)</label>
+              <select id="input-market-value" onchange="onMarketValueChange()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-emerald-300 font-bold focus:outline-none focus:border-emerald-500">
               </select>
             </div>
           </div>
 
           <div>
-            <label class="block text-slate-400 mb-1 text-[11px]">Texto del Pick (Personalizado / Bilingüe)</label>
-            <input type="text" id="input-prediction" oninput="onCustomPickInput()" value="AMBOS EQUIPOS MARCAN (SÍ)" class="w-full bg-slate-950 border border-emerald-500/40 rounded-lg px-3 py-2 font-bold text-emerald-300">
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-slate-400 text-[11px] font-semibold">Texto del Pick en Tarjeta (Resultado)</label>
+              <span class="text-[10px] text-slate-500">Auto-generado según resultado</span>
+            </div>
+            <input type="text" id="input-prediction" oninput="onCustomPickInput()" value="GANA LOCAL" class="w-full bg-slate-950 border border-emerald-500/40 rounded-lg px-3 py-2 font-bold text-emerald-300 focus:outline-none focus:border-emerald-400">
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-slate-400 mb-1 text-[11px]">Cuota (Odd)</label>
-              <input type="number" step="0.01" id="input-odd" value="1.72" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 font-mono font-bold text-white">
+              <input type="number" step="0.01" id="input-odd" oninput="updateCardFromInputs(); refreshFormTikTokContent(false);" value="1.72" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 font-mono font-bold text-white">
             </div>
             <div>
-              <label class="block text-slate-400 mb-1 text-[11px]">Stake (1 a 10)</label>
-              <input type="number" min="1" max="10" id="input-stake" value="8" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 font-mono font-bold text-white">
+              <label class="block text-slate-400 mb-1 text-[11px]">Nivel de Confianza (1 a 10)</label>
+              <input type="number" min="1" max="10" id="input-stake" oninput="updateCardFromInputs(); refreshFormTikTokContent(false);" value="8" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 font-mono font-bold text-white">
             </div>
           </div>
 
@@ -727,7 +963,7 @@
               <span>Probabilidad Estimada</span>
               <span id="confidence-val-display" class="text-emerald-400 font-mono font-bold">68%</span>
             </div>
-            <input type="range" id="input-confidence" min="10" max="99" value="68" class="w-full accent-emerald-500 cursor-pointer">
+            <input type="range" id="input-confidence" min="10" max="99" value="68" oninput="updateCardFromInputs(); refreshFormTikTokContent(false);" class="w-full accent-emerald-500 cursor-pointer">
           </div>
         </div>
 
@@ -759,6 +995,49 @@
             <button type="button" onclick="setTheme('cyan')" class="w-6 h-6 rounded-full bg-cyan-500 ring-2 ring-slate-800 hover:scale-110 transition"></button>
             <button type="button" onclick="setTheme('violet')" class="w-6 h-6 rounded-full bg-violet-500 ring-2 ring-slate-800 hover:scale-110 transition"></button>
             <button type="button" onclick="setTheme('amber')" class="w-6 h-6 rounded-full bg-amber-500 ring-2 ring-slate-800 hover:scale-110 transition"></button>
+          </div>
+        </div>
+
+        <!-- TIKTOK AUTO COPY & HASHTAGS GENERATOR (LIVE GENERATION) -->
+        <div class="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-3.5 rounded-2xl border border-cyan-500/30 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span class="text-cyan-400 font-bold uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                <i data-lucide="hash" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span>Copy & Hashtags de TikTok (Generados Automáticamente)</span>
+              </span>
+            </div>
+            <button type="button" onclick="isTikTokUserEdited = false; refreshFormTikTokContent(true); showBtnFeedback(this, '✅ Regenerado');" class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/30 flex items-center gap-1 transition">
+              <i data-lucide="refresh-cw" class="w-2.5 h-2.5"></i> Regenerar
+            </button>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between text-slate-400 mb-1 text-[11px]">
+              <span class="font-semibold text-slate-300">Descripción / Caption (Gancho + Datos + Llamado a Comentar)</span>
+              <button type="button" onclick="copyFormField('input-tiktok-caption', this)" class="text-[10px] text-cyan-400 hover:text-white font-mono flex items-center gap-1 transition">
+                <i data-lucide="copy" class="w-2.5 h-2.5"></i> Copiar descripción
+              </button>
+            </div>
+            <textarea id="input-tiktok-caption" oninput="isTikTokUserEdited = true" rows="4" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-cyan-500 leading-relaxed"></textarea>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between text-slate-400 mb-1 text-[11px]">
+              <span class="font-semibold text-slate-300">Hashtags Estratégicos (Equipos + Torneo + Nicho)</span>
+              <button type="button" onclick="copyFormField('input-tiktok-hashtags', this)" class="text-[10px] text-cyan-400 hover:text-white font-mono flex items-center gap-1 transition">
+                <i data-lucide="copy" class="w-2.5 h-2.5"></i> Copiar hashtags
+              </button>
+            </div>
+            <textarea id="input-tiktok-hashtags" oninput="isTikTokUserEdited = true" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-cyan-300 font-mono text-[11px] focus:outline-none focus:border-cyan-500"></textarea>
+          </div>
+
+          <div class="pt-0.5">
+            <button type="button" onclick="copyFormTikTokAll(this)" class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-500/20 via-emerald-500/20 to-cyan-500/20 hover:from-cyan-500/30 hover:to-emerald-500/30 text-cyan-300 font-bold text-xs flex items-center justify-center gap-2 border border-cyan-500/40 shadow-lg shadow-cyan-500/10 transition">
+              <i data-lucide="clipboard-copy" class="w-3.5 h-3.5"></i>
+              <span>COPIAR TODO AL PORTAPAPELES (Descripción + Hashtags)</span>
+            </button>
           </div>
         </div>
 
@@ -812,6 +1091,13 @@
             🇺🇸 EN
           </button>
         </div>
+
+        <!-- Botón Revisar Resultados (Cron Automático Yii2) -->
+        <button type="button" onclick="runPredictionsChecker()" id="btn-cron-checker" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 font-bold text-xs flex items-center gap-1.5 border border-emerald-500/40 transition shadow-lg shadow-emerald-500/10" title="Verificar resultados con API-Football (Equivalente al Cron de Yii2)">
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+          <span class="hidden sm:inline">Revisar Resultados</span>
+          <span class="sm:hidden">Revisar</span>
+        </button>
 
         <!-- Botón Laboratorio de Audio -->
         <button type="button" onclick="openAudioLabModal()" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 font-bold text-xs flex items-center gap-1.5 border border-cyan-500/30 transition shadow-lg shadow-cyan-500/10" title="Escuchar muestras de voz neuronal y efectos">
@@ -951,7 +1237,9 @@
       confidenceDisplay: document.getElementById('confidence-val-display'),
       stat1: document.getElementById('input-stat-1'),
       stat2: document.getElementById('input-stat-2'),
-      stat3: document.getElementById('input-stat-3')
+      stat3: document.getElementById('input-stat-3'),
+      tiktokCaption: document.getElementById('input-tiktok-caption'),
+      tiktokHashtags: document.getElementById('input-tiktok-hashtags')
     };
 
     // Card Visual Targets inside #card-canvas
@@ -1016,7 +1304,7 @@
       const confVal = parseInt(inputs.confidence.value, 10) || 70;
 
       if (cardElements.oddPill) cardElements.oddPill.textContent = currentLang === 'es' ? `CUOTA ${oddVal.toFixed(2)}` : `ODD ${oddVal.toFixed(2)}`;
-      if (cardElements.stakePill) cardElements.stakePill.textContent = `STAKE ${stakeVal}/10`;
+      if (cardElements.stakePill) cardElements.stakePill.textContent = currentLang === 'es' ? `CONFIANZA ${stakeVal}/10` : `CONFIDENCE ${stakeVal}/10`;
       if (cardElements.confidenceText) cardElements.confidenceText.textContent = `${confVal}%`;
       if (cardElements.confidenceBar) cardElements.confidenceBar.style.width = `${confVal}%`;
       if (inputs.confidenceDisplay) inputs.confidenceDisplay.textContent = `${confVal}%`;
@@ -1044,15 +1332,18 @@
         cardState.stats_en = [inputs.stat1.value, inputs.stat2.value, inputs.stat3.value];
       }
       updateCardFromInputs();
+      refreshFormTikTokContent(false);
     }
 
     function onCustomPickInput() {
+      inputs.prediction.dataset.auto = 'false';
       if (currentLang === 'es') {
         cardState.custom_pick_es = inputs.prediction.value;
       } else {
         cardState.custom_pick_en = inputs.prediction.value;
       }
       updateCardFromInputs();
+      refreshFormTikTokContent(false);
     }
 
     function parseValidValues(val) {
@@ -1072,22 +1363,247 @@
       return ['YES', 'NO'];
     }
 
-    function onMarketTypeChange() {
-      const typeId = Number(inputs.marketType.value);
-      cardState.type_prediction_id = typeId;
-      const typeObj = typePredictionsList.find(t => t.id === typeId);
+    function isGenericMarketName(text) {
+      if (!text) return true;
+      const t = text.trim().toLowerCase();
+      return (
+        t === 'clásico' ||
+        t === 'clasico' ||
+        t === 'full time result (1x2)' ||
+        t === '1x2' ||
+        t === 'marcador exacto' ||
+        t === 'correct score' ||
+        t === 'ambos equipos marcan' ||
+        t === 'both teams to score (btts)' ||
+        t === 'partido más de x goles' ||
+        t === 'partido menos de x goles' ||
+        t === 'pick' ||
+        t === 'predicción'
+      );
+    }
+
+    function formatMarketPick(typeId, val) {
+      const v = String(val !== undefined && val !== null ? val : '').trim();
+      const vUpper = v.toUpperCase();
+      const tId = Number(typeId || 1);
+
+      const format1X2 = (prefixEs = '', prefixEn = '') => {
+        const preEs = prefixEs ? `${prefixEs} ` : '';
+        const preEn = prefixEn ? `${prefixEn} ` : '';
+        switch (vUpper) {
+          case '1':
+            return {
+              es: `${preEs}Gana Local`,
+              en: `${preEn}Home Win`,
+              optLabel: `1 - Gana Local`
+            };
+          case '2':
+            return {
+              es: `${preEs}Gana Visitante`,
+              en: `${preEn}Away Win`,
+              optLabel: `2 - Gana Visitante`
+            };
+          case 'X':
+            return {
+              es: `${preEs}Empate`,
+              en: `${preEn}Draw`,
+              optLabel: `X - Empate`
+            };
+          case '1X':
+            return {
+              es: `${preEs}Local o Empate (1X)`,
+              en: `${preEn}Home or Draw (1X)`,
+              optLabel: `1X - Local o Empate`
+            };
+          case 'X2':
+            return {
+              es: `${preEs}Empate o Visitante (X2)`,
+              en: `${preEn}Draw or Away (X2)`,
+              optLabel: `X2 - Empate o Visitante`
+            };
+          case '12':
+            return {
+              es: `${preEs}Local o Visitante (12)`,
+              en: `${preEn}Home or Away (12)`,
+              optLabel: `12 - Local o Visitante`
+            };
+          default:
+            return {
+              es: `${preEs}${v || 'Gana Local'}`,
+              en: `${preEn}${v || 'Home Win'}`,
+              optLabel: v || '1'
+            };
+        }
+      };
+
+      switch (tId) {
+        case 1:
+          return format1X2();
+        case 17:
+          return format1X2('1T:', '1st Half:');
+        case 18:
+          return format1X2('2T:', '2nd Half:');
+        case 2:
+          return {
+            es: `Marcador Exacto: ${v}`,
+            en: `Correct Score: ${v}`,
+            optLabel: `Marcador ${v}`
+          };
+        case 3:
+          return {
+            es: `Más de ${v} Goles`,
+            en: `Over ${v} Goals`,
+            optLabel: `+${v} Goles (Más de ${v})`
+          };
+        case 4:
+          return {
+            es: `Menos de ${v} Goles`,
+            en: `Under ${v} Goals`,
+            optLabel: `-${v} Goles (Menos de ${v})`
+          };
+        case 5:
+          return {
+            es: `Local: Más de ${v} Goles`,
+            en: `Home: Over ${v} Goals`,
+            optLabel: `Local +${v} Goles`
+          };
+        case 6:
+          return {
+            es: `Local: Menos de ${v} Goles`,
+            en: `Home: Under ${v} Goals`,
+            optLabel: `Local -${v} Goles`
+          };
+        case 7:
+          return {
+            es: `Visitante: Menos de ${v} Goles`,
+            en: `Away: Under ${v} Goals`,
+            optLabel: `Visitante -${v} Goles`
+          };
+        case 8:
+          return {
+            es: `Visitante: Más de ${v} Goles`,
+            en: `Away: Over ${v} Goals`,
+            optLabel: `Visitante +${v} Goles`
+          };
+        case 9:
+          if (['YES', 'SI', 'SÍ', '1', 'TRUE'].includes(vUpper)) {
+            return {
+              es: 'Ambos Equipos Marcan: SÍ',
+              en: 'Both Teams To Score: YES',
+              optLabel: 'YES - Sí marcan ambos'
+            };
+          } else {
+            return {
+              es: 'Ambos Equipos Marcan: NO',
+              en: 'Both Teams To Score: NO',
+              optLabel: 'NO - No marcan ambos'
+            };
+          }
+        case 10:
+          return {
+            es: `Más de ${v} Córners`,
+            en: `Over ${v} Corners`,
+            optLabel: `+${v} Córners`
+          };
+        case 11:
+          return {
+            es: `Menos de ${v} Córners`,
+            en: `Under ${v} Corners`,
+            optLabel: `-${v} Córners`
+          };
+        case 12:
+          return {
+            es: `Más de ${v} Tarjetas`,
+            en: `Over ${v} Yellow Cards`,
+            optLabel: `+${v} Tarjetas`
+          };
+        case 13:
+          return {
+            es: `Menos de ${v} Tarjetas`,
+            en: `Under ${v} Yellow Cards`,
+            optLabel: `-${v} Tarjetas`
+          };
+        case 14:
+          return {
+            es: `Hándicap Local (${v})`,
+            en: `Asian Handicap Home (${v})`,
+            optLabel: `Hándicap Local (${v})`
+          };
+        case 15:
+          return {
+            es: `Hándicap Visitante (${v})`,
+            en: `Asian Handicap Away (${v})`,
+            optLabel: `Hándicap Visitante (${v})`
+          };
+        case 16:
+          return {
+            es: `Hándicap Asiático (${v})`,
+            en: `Asian Handicap (${v})`,
+            optLabel: `Hándicap (${v})`
+          };
+        case 19:
+        case 21:
+          return {
+            es: `1T: Más de ${v} Goles`,
+            en: `1st Half Over ${v} Goals`,
+            optLabel: `1T +${v} Goles`
+          };
+        case 20:
+        case 22:
+          return {
+            es: `1T: Menos de ${v} Goles`,
+            en: `1st Half Under ${v} Goals`,
+            optLabel: `1T -${v} Goles`
+          };
+        case 23:
+          return {
+            es: `Más de ${v} Tiros al Arco`,
+            en: `Over ${v} Shots on Target`,
+            optLabel: `+${v} Tiros al Arco`
+          };
+        case 24:
+          return {
+            es: `Local: Más de ${v} Tiros al Arco`,
+            en: `Home: Over ${v} Shots on Target`,
+            optLabel: `Local +${v} Tiros al Arco`
+          };
+        case 25:
+          return {
+            es: `Visitante: Más de ${v} Tiros al Arco`,
+            en: `Away: Over ${v} Shots on Target`,
+            optLabel: `Visitante +${v} Tiros al Arco`
+          };
+        default:
+          return {
+            es: `Pick: ${v}`,
+            en: `Pick: ${v}`,
+            optLabel: v
+          };
+      }
+    }
+
+    function populateMarketValues(typeId, selectedValue = null) {
+      cardState.type_prediction_id = Number(typeId);
+      const typeObj = typePredictionsList.find(t => t.id === Number(typeId));
       if (!typeObj) return;
 
       const values = parseValidValues(typeObj.valid_values);
       inputs.marketValue.innerHTML = '';
       values.forEach(val => {
+        const formatted = formatMarketPick(typeId, val);
         const opt = document.createElement('option');
         opt.value = val;
-        opt.textContent = val;
+        opt.textContent = formatted.optLabel;
         inputs.marketValue.appendChild(opt);
       });
 
-      inputs.marketValue.value = values[0] || 'YES';
+      const targetVal = selectedValue || values[0] || '1';
+      inputs.marketValue.value = values.includes(targetVal) ? targetVal : (values[0] || '1');
+    }
+
+    function onMarketTypeChange() {
+      const typeId = Number(inputs.marketType.value);
+      populateMarketValues(typeId);
       onMarketValueChange();
     }
 
@@ -1095,15 +1611,14 @@
       const typeId = Number(inputs.marketType.value);
       const val = inputs.marketValue.value;
       cardState.prediction_value = val;
-      const typeObj = typePredictionsList.find(t => t.id === typeId);
 
-      const labelEs = typeObj ? typeObj.label_es.replace('{value}', val) : `MERCADO ${val}`;
-      const labelEn = typeObj ? typeObj.label_en.replace('{value}', val) : `MARKET ${val}`;
-
-      cardState.custom_pick_es = labelEs;
-      cardState.custom_pick_en = labelEn;
-      inputs.prediction.value = currentLang === 'es' ? labelEs : labelEn;
+      const formatted = formatMarketPick(typeId, val);
+      cardState.custom_pick_es = formatted.es;
+      cardState.custom_pick_en = formatted.en;
+      inputs.prediction.value = currentLang === 'es' ? formatted.es : formatted.en;
+      inputs.prediction.dataset.auto = 'true';
       updateCardFromInputs();
+      refreshFormTikTokContent(false);
     }
 
     function onMatchDateTimeChange(isoString) {
@@ -1160,6 +1675,7 @@
       if (inputs.stat3) inputs.stat3.value = stats[2] || '';
 
       updateCardFromInputs();
+      refreshFormTikTokContent(false);
       loadPredictionsTable(currentTablePage, currentTableSearch);
     }
 
@@ -1238,12 +1754,12 @@
           const tr = document.createElement('tr');
           tr.className = 'hover:bg-slate-800/40 transition group';
 
-          // Status Badge: 2: Pendiente, 1: Acertada, 0: Fallada
-          let statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">⏳ Pendiente</span>';
+          // Status Badge: 2: Pendiente, 1: Acertada, 0: Fallada (Interactivo con modal de calificación)
+          let statusBadge = `<button type="button" onclick="openManualSettleModal(${p.id})" title="Calificar predicción #${p.id}" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition hover:scale-105 cursor-pointer">⏳ Pendiente <i data-lucide="edit-2" class="w-2.5 h-2.5 opacity-60"></i></button>`;
           if (p.was_right === 1) {
-            statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✅ Acertada</span>';
+            statusBadge = `<button type="button" onclick="openManualSettleModal(${p.id})" title="Predicción Acertada (Clic para cambiar)" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition hover:scale-105 cursor-pointer">✅ Acertada <i data-lucide="edit-2" class="w-2.5 h-2.5 opacity-60"></i></button>`;
           } else if (p.was_right === 0) {
-            statusBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">❌ Fallada</span>';
+            statusBadge = `<button type="button" onclick="openManualSettleModal(${p.id})" title="Predicción Fallada (Clic para cambiar)" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition hover:scale-105 cursor-pointer">❌ Fallada <i data-lucide="edit-2" class="w-2.5 h-2.5 opacity-60"></i></button>`;
           }
 
           // Timing Badge
@@ -1251,7 +1767,11 @@
             ? '<span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">Finalizado / En juego</span>'
             : '<span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Por disputar</span>';
 
-          const pickText = (currentLang === 'es' ? p.custom_pick_es : p.custom_pick_en) || p.custom_pick_es || p.custom_pick_en || 'PICK';
+          let pickText = (currentLang === 'es' ? p.custom_pick_es : p.custom_pick_en) || p.custom_pick_es || p.custom_pick_en;
+          if (!pickText || isGenericMarketName(pickText)) {
+            const autoPick = formatMarketPick(p.type_prediction_id, p.prediction_value);
+            pickText = currentLang === 'es' ? autoPick.es : autoPick.en;
+          }
 
           tr.innerHTML = `
             <td class="py-3 px-3 text-center font-mono text-slate-500 font-bold">${p.id}</td>
@@ -1283,7 +1803,7 @@
               <div class="font-bold text-emerald-400 text-xs truncate max-w-[170px]" title="${pickText}">${pickText}</div>
               <div class="flex items-center gap-1.5 mt-0.5">
                 <span class="text-[10px] font-mono bg-slate-800 px-1.5 py-0.2 rounded text-slate-300">Cuota: ${Number(p.odd || 1.75).toFixed(2)}</span>
-                <span class="text-[10px] font-mono bg-slate-800 px-1.5 py-0.2 rounded text-slate-300">Stake: ${p.stake_bet || 8}/10</span>
+                <span class="text-[10px] font-mono bg-slate-800 px-1.5 py-0.2 rounded text-slate-300">Confianza: ${p.stake_bet || 8}/10</span>
               </div>
             </td>
             <td class="py-3 px-2 text-center whitespace-nowrap">
@@ -1297,6 +1817,12 @@
             </td>
             <td class="py-3 px-3 text-right whitespace-nowrap">
               <div class="flex items-center justify-end gap-1">
+                <button type="button" onclick="openManualSettleModal(${p.id})" title="Calificar / Revisar Resultado" class="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-slate-950 border border-emerald-500/30 transition">
+                  <i data-lucide="award" class="w-4 h-4"></i>
+                </button>
+                <button type="button" onclick="openTikTokModal(${p.id})" title="Copiar Copy y Hashtags TikTok" class="p-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500 text-cyan-400 hover:text-slate-950 border border-cyan-500/30 transition">
+                  <i data-lucide="hash" class="w-4 h-4"></i>
+                </button>
                 <button type="button" onclick="openPreviewModal(${p.id})" title="Ver Vista Previa 9:16" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 transition">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
@@ -1373,6 +1899,12 @@
       cardState.fixture_id = null;
       document.getElementById('form-modal-title').textContent = 'NUEVA PREDICCIÓN';
       document.getElementById('btn-save-text').textContent = 'Guardar en Base de Datos';
+      const fixInput = document.getElementById('fixture-search-input');
+      if (fixInput) fixInput.value = '';
+      const fixList = document.getElementById('fixture-autocomplete-list');
+      if (fixList) fixList.classList.add('hidden');
+      const upcomingChk = document.getElementById('fixture-upcoming-only');
+      if (upcomingChk) upcomingChk.checked = true;
 
       // Default Blank/Fresh state
       inputs.league.value = 'LIGA BETPLAY • COLOMBIA';
@@ -1391,11 +1923,18 @@
       inputs.stat3.value = '🛡️ Visita: Millonarios ha anotado en sus últimas 6 salidas';
 
       if (typePredictionsList.length > 0) {
-        inputs.marketType.value = '9';
-        onMarketTypeChange();
+        inputs.marketType.value = '1';
+        populateMarketValues(1, '1');
+        const autoPick = formatMarketPick(1, '1');
+        cardState.custom_pick_es = autoPick.es;
+        cardState.custom_pick_en = autoPick.en;
+        inputs.prediction.value = currentLang === 'es' ? autoPick.es : autoPick.en;
+        inputs.prediction.dataset.auto = 'true';
       }
 
+      isTikTokUserEdited = false;
       updateCardFromInputs();
+      refreshFormTikTokContent(true);
       document.getElementById('prediction-form-modal').classList.remove('hidden');
     }
 
@@ -1443,10 +1982,22 @@
           inputs.matchDatetime.value = '';
         }
 
-        inputs.marketType.value = String(p.type_prediction_id || 9);
-        onMarketTypeChange();
-        if (p.prediction_value) inputs.marketValue.value = p.prediction_value;
-        inputs.prediction.value = (currentLang === 'es' ? p.custom_pick_es : p.custom_pick_en) || p.custom_pick_es || p.custom_pick_en || '';
+        const typeId = Number(p.type_prediction_id || 1);
+        inputs.marketType.value = String(typeId);
+        populateMarketValues(typeId, p.prediction_value || '1');
+
+        let pickEs = p.custom_pick_es;
+        let pickEn = p.custom_pick_en;
+        const isGeneric = isGenericMarketName(pickEs);
+        if (!pickEs || isGeneric) {
+          const autoPick = formatMarketPick(typeId, p.prediction_value || '1');
+          pickEs = autoPick.es;
+          pickEn = autoPick.en;
+        }
+        cardState.custom_pick_es = pickEs;
+        cardState.custom_pick_en = pickEn;
+        inputs.prediction.value = (currentLang === 'es' ? pickEs : pickEn) || pickEs || pickEn || '';
+        inputs.prediction.dataset.auto = isGeneric ? 'true' : 'false';
         inputs.odd.value = p.odd || 1.75;
         inputs.stake.value = p.stake_bet || 8;
         inputs.confidence.value = p.probability || 70;
@@ -1458,6 +2009,28 @@
 
         setTheme(p.theme || 'emerald');
         updateCardFromInputs();
+
+        // Populate or auto-generate TikTok fields
+        inputs.tiktokCaption.value = p.tiktok_caption || '';
+        inputs.tiktokHashtags.value = p.tiktok_hashtags || '';
+
+        const homeWord = (p.home_name || '').trim().split(/\s+/)[0]?.toUpperCase();
+        const awayWord = (p.away_name || '').trim().split(/\s+/)[0]?.toUpperCase();
+        const capUpper = (inputs.tiktokCaption.value || '').toUpperCase();
+        const tagsUpper = (inputs.tiktokHashtags.value || '').toUpperCase();
+
+        const hasTemplateLeak = (capUpper.includes('TOLIMA') && !(p.home_name||'').toUpperCase().includes('TOLIMA') && !(p.away_name||'').toUpperCase().includes('TOLIMA')) ||
+                               (capUpper.includes('MILLONARIOS') && !(p.home_name||'').toUpperCase().includes('MILLONARIOS') && !(p.away_name||'').toUpperCase().includes('MILLONARIOS'));
+        const hasTeamMismatch = (homeWord && homeWord.length >= 4 && !capUpper.includes(homeWord) && !tagsUpper.includes(homeWord)) &&
+                                (awayWord && awayWord.length >= 4 && !capUpper.includes(awayWord) && !tagsUpper.includes(awayWord));
+
+        if (!inputs.tiktokCaption.value || !inputs.tiktokHashtags.value || hasTemplateLeak || hasTeamMismatch) {
+          isTikTokUserEdited = false;
+          refreshFormTikTokContent(true);
+        } else {
+          isTikTokUserEdited = false;
+        }
+
         document.getElementById('prediction-form-modal').classList.remove('hidden');
       } catch (err) {
         alert('Error al abrir predicción: ' + err.message);
@@ -1487,6 +2060,9 @@
 
       try {
         onStatInput();
+        if (!isTikTokUserEdited) {
+          refreshFormTikTokContent(false);
+        }
         const payload = {
           id: cardState.id,
           fixture_id: cardState.fixture_id,
@@ -1510,6 +2086,8 @@
           probability: parseInt(inputs.confidence.value, 10) || 70,
           stats_en: cardState.stats_en,
           stats_es: cardState.stats_es,
+          tiktok_caption: inputs.tiktokCaption ? inputs.tiktokCaption.value : null,
+          tiktok_hashtags: inputs.tiktokHashtags ? inputs.tiktokHashtags.value : null,
           theme: currentTheme
         };
 
@@ -1549,6 +2127,412 @@
     }
 
     // =========================================================================
+    // TIKTOK COPY & HASHTAGS GENERATOR & MODAL
+    // =========================================================================
+
+    let currentActivePrediction = null;
+
+    function cleanClientHashtag(str) {
+      if (!str) return '';
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9 ]/g, '')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join('');
+    }
+
+    function generateClientTikTokContent(pred = {}) {
+      const home = pred.home_name || (inputs.homeName ? inputs.homeName.value : '') || 'LOCAL';
+      const away = pred.away_name || (inputs.awayName ? inputs.awayName.value : '') || 'VISITANTE';
+      const league = pred.league_name || (inputs.league ? inputs.league.value : '') || 'LIGA';
+      const stadium = pred.stadium || (inputs.stadium ? inputs.stadium.value : '');
+      const stadiumText = stadium ? ` en ${stadium}` : '';
+      let pick = pred.custom_pick_es || (inputs.prediction ? inputs.prediction.value : '');
+      if (!pick || isGenericMarketName(pick)) {
+        const typeId = pred.type_prediction_id || (inputs.marketType ? inputs.marketType.value : 1);
+        const val = pred.prediction_value || (inputs.marketValue ? inputs.marketValue.value : '1');
+        pick = formatMarketPick(typeId, val).es;
+      }
+      if (!pick) pick = 'Victoria Local';
+      const odd = Number(pred.odd || (inputs.odd ? inputs.odd.value : 1.75) || 1.75).toFixed(2);
+      const prob = `${pred.probability || (inputs.confidence ? inputs.confidence.value : 70) || 70}%`;
+      const stake = `${pred.stake_bet || (inputs.stake ? inputs.stake.value : 8) || 8}/10`;
+
+      const lUpper = league.toUpperCase();
+      let leagueHeader = 'FÚTBOL INTERNACIONAL ⚽';
+      let leagueTag = 'Futbol';
+
+      if (lUpper.includes('BETPLAY') || lUpper.includes('COLOMBIA') || lUpper.includes('PRIMERA A')) {
+        leagueHeader = 'LIGA BETPLAY COLOMBIA 🇨🇴';
+        leagueTag = 'LigaBetPlay';
+      } else if (lUpper.includes('PREMIER')) {
+        leagueHeader = 'PREMIER LEAGUE 🏴󠁧󠁢󠁥󠁮󠁧󠁿';
+        leagueTag = 'PremierLeague';
+      } else if (lUpper.includes('CHAMPIONS')) {
+        leagueHeader = 'UEFA CHAMPIONS LEAGUE 🏆';
+        leagueTag = 'ChampionsLeague';
+      } else if (lUpper.includes('LALIGA') || lUpper.includes('LA LIGA')) {
+        leagueHeader = 'LALIGA DE ESPAÑA 🇪🇸';
+        leagueTag = 'LaLiga';
+      } else if (lUpper.includes('LIBERTADORES')) {
+        leagueHeader = 'COPA LIBERTADORES 🌎';
+        leagueTag = 'CopaLibertadores';
+      } else if (lUpper.includes('SERIE A')) {
+        leagueHeader = 'SERIE A ITALIANA 🇮🇹';
+        leagueTag = 'SerieA';
+      } else if (lUpper.includes('BUNDESLIGA')) {
+        leagueHeader = 'BUNDESLIGA ALEMANA 🇩🇪';
+        leagueTag = 'Bundesliga';
+      }
+
+      const s1 = pred.stats_es?.[0] || (inputs.stat1 ? inputs.stat1.value : '');
+      const s2 = pred.stats_es?.[1] || (inputs.stat2 ? inputs.stat2.value : '');
+      const s3 = pred.stats_es?.[2] || (inputs.stat3 ? inputs.stat3.value : '');
+      const statsList = [s1, s2, s3].filter(Boolean);
+      const statsBlock = statsList.map(s => `• ${s}`).join('\n');
+
+      const caption = 
+`🔥 ¡PRONÓSTICO ${leagueHeader}! ⚽
+${home} vs ${away}${stadiumText}
+
+🎯 Pick Recomendado: ${pick}
+📈 Cuota: ${odd} | Probabilidad estimada: ${prob}
+
+${statsBlock ? `📊 Datos Clave:\n${statsBlock}\n` : ''}
+¿Cuál es tu marcador exacto para este partidazo? ¡Déjamelo en los comentarios! 👇💬
+
+¡Síguenos en TikTok para más pronósticos diarios y análisis deportivo! 
+Somos PrediFutbol Colombia 🇨🇴⚡`.trim();
+
+      const homeTag = cleanClientHashtag(home);
+      const awayTag = cleanClientHashtag(away);
+      const matchTag = `${homeTag}vs${awayTag}`;
+      const isCol = lUpper.includes('COLOMBIA') || lUpper.includes('BETPLAY') || lUpper.includes('PRIMERA A');
+
+      const tagList = [
+        '#PrediFutbol',
+        '#PrediFutbolColombia',
+        matchTag ? `#${matchTag}` : null,
+        homeTag ? `#${homeTag}` : null,
+        awayTag ? `#${awayTag}` : null,
+        `#${leagueTag}`,
+        isCol ? '#FutbolColombiano' : null,
+        '#PronosticosDeportivos',
+        '#AnalisisDeportivo',
+        '#DatosDeportivos',
+        '#TipsDeportivos',
+        '#Parati',
+        '#Viral',
+        '#FYP',
+        '#Colombia'
+      ].filter(Boolean);
+
+      const hashtags = [...new Set(tagList)].join(' ');
+      const fullText = `${caption}\n\n${hashtags}`;
+
+      return { caption, hashtags, fullText };
+    }
+
+    let isTikTokUserEdited = false;
+
+    function refreshFormTikTokContent(force = false) {
+      if (!inputs.tiktokCaption || !inputs.tiktokHashtags) return;
+      if (!force && isTikTokUserEdited) return;
+
+      const generated = generateClientTikTokContent();
+      inputs.tiktokCaption.value = generated.caption;
+      inputs.tiktokHashtags.value = generated.hashtags;
+    }
+
+    async function openTikTokModal(id) {
+      let pred = null;
+      if (id) {
+        pred = (tableData.results || []).find(p => p.id === id);
+        if (!pred) {
+          try {
+            const res = await fetch(`/api/predictions/${id}`);
+            const d = await res.json();
+            if (d.success && d.prediction) pred = d.prediction;
+          } catch (e) {}
+        }
+      }
+
+      if (!pred) {
+        pred = {
+          home_name: inputs.homeName ? inputs.homeName.value : '',
+          away_name: inputs.awayName ? inputs.awayName.value : '',
+          league_name: inputs.league ? inputs.league.value : '',
+          stadium: inputs.stadium ? inputs.stadium.value : '',
+          custom_pick_es: inputs.prediction ? inputs.prediction.value : '',
+          odd: parseFloat(inputs.odd ? inputs.odd.value : 1.75) || 1.75,
+          probability: parseInt(inputs.confidence ? inputs.confidence.value : 70, 10) || 70,
+          stake_bet: parseInt(inputs.stake ? inputs.stake.value : 8, 10) || 8,
+          stats_es: [
+            inputs.stat1 ? inputs.stat1.value : '',
+            inputs.stat2 ? inputs.stat2.value : '',
+            inputs.stat3 ? inputs.stat3.value : ''
+          ].filter(Boolean),
+          tiktok_caption: inputs.tiktokCaption ? inputs.tiktokCaption.value : '',
+          tiktok_hashtags: inputs.tiktokHashtags ? inputs.tiktokHashtags.value : ''
+        };
+      }
+
+      currentActivePrediction = pred;
+      const generated = generateClientTikTokContent(pred);
+
+      const caption = pred.tiktok_caption || generated.caption;
+      const hashtags = pred.tiktok_hashtags || generated.hashtags;
+
+      const subTitle = document.getElementById('tiktok-modal-subtitle');
+      if (subTitle) {
+        subTitle.textContent = `${pred.home_name || 'LOCAL'} vs ${pred.away_name || 'VISITANTE'} • ${pred.league_name || 'FÚTBOL'}`;
+      }
+      const capArea = document.getElementById('tiktok-modal-caption');
+      if (capArea) capArea.value = caption;
+      const tagArea = document.getElementById('tiktok-modal-hashtags');
+      if (tagArea) tagArea.value = hashtags;
+
+      const masterBtnText = document.getElementById('btn-copy-tiktok-master-text');
+      if (masterBtnText) masterBtnText.textContent = 'COPIAR TODO AL PORTAPAPELES (LISTO PARA TIKTOK)';
+
+      document.getElementById('tiktok-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function openTikTokModalFromCurrentPreview() {
+      openTikTokModal(cardState.id);
+    }
+
+    function closeTikTokModal() {
+      document.getElementById('tiktok-modal').classList.add('hidden');
+    }
+
+    async function copyTikTokMaster() {
+      const cap = document.getElementById('tiktok-modal-caption');
+      const tag = document.getElementById('tiktok-modal-hashtags');
+      const caption = cap ? cap.value.trim() : '';
+      const hashtags = tag ? tag.value.trim() : '';
+      const fullText = `${caption}\n\n${hashtags}`;
+
+      try {
+        await navigator.clipboard.writeText(fullText);
+        const btnText = document.getElementById('btn-copy-tiktok-master-text');
+        if (btnText) {
+          const oldText = btnText.textContent;
+          btnText.textContent = '✅ ¡TODO COPIADO AL PORTAPAPELES!';
+          setTimeout(() => { btnText.textContent = oldText; }, 2500);
+        }
+      } catch (err) {
+        copyFallbackText(fullText);
+        const btnText = document.getElementById('btn-copy-tiktok-master-text');
+        if (btnText) {
+          btnText.textContent = '✅ ¡TODO COPIADO AL PORTAPAPELES!';
+          setTimeout(() => { btnText.textContent = 'COPIAR TODO AL PORTAPAPELES (LISTO PARA TIKTOK)'; }, 2500);
+        }
+      }
+    }
+
+    async function copyElementText(elemId, btn) {
+      const elem = document.getElementById(elemId);
+      if (!elem) return;
+      const text = elem.value || elem.textContent || '';
+      try {
+        await navigator.clipboard.writeText(text);
+        showBtnFeedback(btn, '✅ ¡Copiado!');
+      } catch (e) {
+        copyFallbackText(text);
+        showBtnFeedback(btn, '✅ ¡Copiado!');
+      }
+    }
+
+    async function copyFormField(elemId, btn) {
+      const elem = document.getElementById(elemId);
+      if (!elem) return;
+      const text = elem.value || '';
+      try {
+        await navigator.clipboard.writeText(text);
+        showBtnFeedback(btn, '✅ ¡Copiado!');
+      } catch (e) {
+        copyFallbackText(text);
+        showBtnFeedback(btn, '✅ ¡Copiado!');
+      }
+    }
+
+    async function copyFormTikTokAll(btn) {
+      const cap = (inputs.tiktokCaption ? inputs.tiktokCaption.value : '').trim();
+      const tags = (inputs.tiktokHashtags ? inputs.tiktokHashtags.value : '').trim();
+      const full = `${cap}\n\n${tags}`;
+      try {
+        await navigator.clipboard.writeText(full);
+        showBtnFeedback(btn, '✅ ¡TODO COPIADO CON ÉXITO!');
+      } catch (e) {
+        copyFallbackText(full);
+        showBtnFeedback(btn, '✅ ¡TODO COPIADO CON ÉXITO!');
+      }
+    }
+
+    function showBtnFeedback(btn, text) {
+      if (!btn) return;
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = text;
+      btn.classList.add('text-emerald-400');
+      setTimeout(() => {
+        btn.innerHTML = oldHtml;
+        btn.classList.remove('text-emerald-400');
+        lucide.createIcons();
+      }, 2000);
+    }
+
+    function copyFallbackText(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+
+    // =========================================================================
+    // PREDICTIONS CHECKER (CRON EQUIVALENT) & MANUAL SETTLEMENT
+    // =========================================================================
+
+    let currentSettlePrediction = null;
+
+    async function runPredictionsChecker() {
+      const btn = document.getElementById('btn-cron-checker');
+      const origHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin"></div> <span>Revisando...</span>';
+
+      try {
+        const res = await fetch('/api/predictions/check-all', { method: 'POST' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Error al ejecutar la revisión');
+
+        openCheckerSummaryModal(data.summary);
+        loadPredictionsTable(currentTablePage, currentTableSearch);
+      } catch (err) {
+        alert('Error al revisar predicciones: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        lucide.createIcons();
+      }
+    }
+
+    function openCheckerSummaryModal(summary) {
+      if (!summary) return;
+      document.getElementById('kpi-total-checked').textContent = summary.totalPending || 0;
+      document.getElementById('kpi-won').textContent = summary.won || 0;
+      document.getElementById('kpi-lost').textContent = summary.lost || 0;
+      document.getElementById('kpi-pending').textContent = summary.stillPending || 0;
+
+      const listEl = document.getElementById('checker-results-list');
+      listEl.innerHTML = '';
+
+      if (!summary.results || summary.results.length === 0) {
+        listEl.innerHTML = '<p class="text-slate-500 text-center py-4">No había predicciones pendientes por revisar.</p>';
+      } else {
+        summary.results.forEach(r => {
+          const row = document.createElement('div');
+          row.className = 'py-2.5 flex items-center justify-between gap-2';
+          
+          let badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">⏳ Pendiente</span>';
+          if (r.was_right === 1) {
+            badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">✅ Acertada</span>';
+          } else if (r.was_right === 0) {
+            badge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">❌ Fallada</span>';
+          }
+
+          row.innerHTML = `
+            <div class="truncate">
+              <div class="font-bold text-white text-xs">${r.home_name} vs ${r.away_name} ${r.score ? `<span class="text-emerald-400 font-mono ml-1">(${r.score})</span>` : ''}</div>
+              <div class="text-[10px] text-slate-400 truncate">Pick: <strong class="text-slate-300">${r.pick || ''}</strong> ${r.source ? `• Fuente: ${r.source}` : (r.reason ? `• ${r.reason}` : '')}</div>
+            </div>
+            <div class="shrink-0">${badge}</div>
+          `;
+          listEl.appendChild(row);
+        });
+      }
+
+      document.getElementById('checker-summary-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeCheckerSummaryModal() {
+      document.getElementById('checker-summary-modal').classList.add('hidden');
+    }
+
+    async function openManualSettleModal(predId) {
+      const pred = (tableData.results || []).find(p => p.id === predId);
+      if (!pred) return;
+      currentSettlePrediction = pred;
+
+      document.getElementById('settle-match-name').textContent = `${pred.home_name} vs ${pred.away_name}`;
+      document.getElementById('settle-pick-text').textContent = (currentLang === 'es' ? pred.custom_pick_es : pred.custom_pick_en) || pred.custom_pick_es || pred.custom_pick_en || pred.prediction_value;
+      document.getElementById('settle-home-label').textContent = `Goles ${pred.home_name}`;
+      document.getElementById('settle-away-label').textContent = `Goles ${pred.away_name}`;
+      document.getElementById('settle-home-goals').value = '';
+      document.getElementById('settle-away-goals').value = '';
+
+      document.getElementById('manual-settle-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeManualSettleModal() {
+      document.getElementById('manual-settle-modal').classList.add('hidden');
+      currentSettlePrediction = null;
+    }
+
+    async function submitScoreSettle() {
+      if (!currentSettlePrediction) return;
+      const h = document.getElementById('settle-home-goals').value;
+      const a = document.getElementById('settle-away-goals').value;
+      if (h === '' || a === '') {
+        alert('Por favor ingresa los goles de ambos equipos para evaluar la regla.');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/predictions/${currentSettlePrediction.id}/settle`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goal_home: parseInt(h, 10), goal_away: parseInt(a, 10) })
+        });
+        const d = await res.json();
+        if (!d.success) throw new Error(d.error || 'No se pudo calificar');
+
+        closeManualSettleModal();
+        loadPredictionsTable(currentTablePage, currentTableSearch);
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    async function submitDirectSettle(outcome) {
+      if (!currentSettlePrediction) return;
+      try {
+        const res = await fetch(`/api/predictions/${currentSettlePrediction.id}/settle`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ was_right: outcome })
+        });
+        const d = await res.json();
+        if (!d.success) throw new Error(d.error || 'No se pudo calificar');
+
+        closeManualSettleModal();
+        loadPredictionsTable(currentTablePage, currentTableSearch);
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    // =========================================================================
     // PREVIEW MODAL LOGIC
     // =========================================================================
 
@@ -1582,8 +2566,16 @@
       cardState.league_id = p.league_id;
       cardState.home_team_id = p.home_team_id;
       cardState.away_team_id = p.away_team_id;
-      cardState.custom_pick_es = p.custom_pick_es;
-      cardState.custom_pick_en = p.custom_pick_en;
+
+      let pickEs = p.custom_pick_es;
+      let pickEn = p.custom_pick_en;
+      if (!pickEs || isGenericMarketName(pickEs)) {
+        const autoPick = formatMarketPick(p.type_prediction_id, p.prediction_value);
+        pickEs = autoPick.es;
+        pickEn = autoPick.en;
+      }
+      cardState.custom_pick_es = pickEs;
+      cardState.custom_pick_en = pickEn;
       cardState.stats_es = Array.isArray(p.stats_es) ? p.stats_es : [];
       cardState.stats_en = Array.isArray(p.stats_en) ? p.stats_en : [];
 
@@ -1597,12 +2589,32 @@
       inputs.odd.value = p.odd || 1.75;
       inputs.stake.value = p.stake_bet || 8;
       inputs.confidence.value = p.probability || 70;
-      inputs.prediction.value = (currentLang === 'es' ? p.custom_pick_es : p.custom_pick_en) || p.custom_pick_es || p.custom_pick_en || '';
+      inputs.prediction.value = (currentLang === 'es' ? pickEs : pickEn) || pickEs || pickEn || '';
+
+      if (inputs.marketType) {
+        inputs.marketType.value = String(p.type_prediction_id || 1);
+        populateMarketValues(Number(p.type_prediction_id || 1), p.prediction_value || '1');
+      }
 
       const stats = currentLang === 'es' ? cardState.stats_es : cardState.stats_en;
       inputs.stat1.value = stats[0] || '';
       inputs.stat2.value = stats[1] || '';
       inputs.stat3.value = stats[2] || '';
+
+      if (inputs.tiktokCaption) inputs.tiktokCaption.value = p.tiktok_caption || '';
+      if (inputs.tiktokHashtags) inputs.tiktokHashtags.value = p.tiktok_hashtags || '';
+      const homeWord = (p.home_name || '').trim().split(/\s+/)[0]?.toUpperCase();
+      const awayWord = (p.away_name || '').trim().split(/\s+/)[0]?.toUpperCase();
+      const capUpper = (inputs.tiktokCaption?.value || '').toUpperCase();
+      const tagsUpper = (inputs.tiktokHashtags?.value || '').toUpperCase();
+      const hasTemplateLeak = (capUpper.includes('TOLIMA') && !(p.home_name||'').toUpperCase().includes('TOLIMA') && !(p.away_name||'').toUpperCase().includes('TOLIMA')) ||
+                             (capUpper.includes('MILLONARIOS') && !(p.home_name||'').toUpperCase().includes('MILLONARIOS') && !(p.away_name||'').toUpperCase().includes('MILLONARIOS'));
+      const hasTeamMismatch = (homeWord && homeWord.length >= 4 && !capUpper.includes(homeWord) && !tagsUpper.includes(homeWord)) &&
+                              (awayWord && awayWord.length >= 4 && !capUpper.includes(awayWord) && !tagsUpper.includes(awayWord));
+      if (!inputs.tiktokCaption?.value || !inputs.tiktokHashtags?.value || hasTemplateLeak || hasTeamMismatch) {
+        isTikTokUserEdited = false;
+        refreshFormTikTokContent(true);
+      }
 
       setTheme(p.theme || 'emerald');
       updateCardFromInputs();
@@ -1672,6 +2684,8 @@
           probability: parseInt(inputs.confidence.value, 10) || 70,
           stats_en: cardState.stats_en,
           stats_es: cardState.stats_es,
+          tiktok_caption: inputs.tiktokCaption ? inputs.tiktokCaption.value : null,
+          tiktok_hashtags: inputs.tiktokHashtags ? inputs.tiktokHashtags.value : null,
           theme: currentTheme
         };
 
@@ -1754,7 +2768,12 @@
             linkRow.className = 'flex items-center justify-between bg-slate-900 px-2.5 py-1.5 rounded-lg border border-emerald-500/30';
             linkRow.innerHTML = `
               <span class="font-mono text-emerald-300 font-bold truncate">${f.fileName}</span>
-              <a href="${f.url}" target="_blank" download="${f.fileName}" class="text-emerald-400 hover:underline font-bold ml-2 shrink-0">Descargar</a>
+              <div class="flex items-center gap-2 shrink-0 ml-2">
+                <button type="button" onclick="openTikTokModal(${cardState.id || 'null'})" class="text-[10px] bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded font-bold transition flex items-center gap-1">
+                  <i data-lucide="hash" class="w-2.5 h-2.5"></i> Copy TikTok
+                </button>
+                <a href="${f.url}" target="_blank" download="${f.fileName}" class="text-emerald-400 hover:underline font-bold text-xs">Descargar</a>
+              </div>
             `;
             list.prepend(linkRow);
           }
@@ -1875,6 +2894,7 @@
     let teamSearchTimer = null;
     function onTeamInput(side, query) {
       updateCardFromInputs();
+      refreshFormTikTokContent(false);
       clearTimeout(teamSearchTimer);
       const listEl = document.getElementById(`${side}-team-autocomplete`);
       if (!query || query.trim().length < 2) {
@@ -1894,31 +2914,34 @@
 
           listEl.innerHTML = '';
           teams.forEach(t => {
+            const transName = (typeof translateTeamName === 'function') ? translateTeamName(t.name) : t.name;
+            const extraAlias = transName !== t.name ? ` <span class="text-slate-400 font-normal text-[10px]">(${t.name})</span>` : '';
             const row = document.createElement('button');
             row.type = 'button';
             row.className = 'w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center gap-2.5 transition';
             row.innerHTML = `
               <img src="${t.logo || ''}" class="w-5 h-5 object-contain" onerror="this.style.display='none'">
               <div class="truncate">
-                <span class="font-bold text-white text-xs">${t.name}</span>
+                <span class="font-bold text-white text-xs">${transName}</span>${extraAlias}
                 <span class="text-[10px] text-slate-400 ml-1">(${t.country || 'Club'})</span>
               </div>
             `;
             row.onclick = () => {
               if (side === 'home') {
                 cardState.home_team_id = t.id;
-                inputs.homeName.value = t.name.toUpperCase();
+                inputs.homeName.value = transName.toUpperCase();
                 inputs.homeFlag.value = t.logo || '⚽';
                 if (t.venue_name) {
                   inputs.stadium.value = [t.venue_name, t.venue_city].filter(Boolean).join(', ');
                 }
               } else {
                 cardState.away_team_id = t.id;
-                inputs.awayName.value = t.name.toUpperCase();
+                inputs.awayName.value = transName.toUpperCase();
                 inputs.awayFlag.value = t.logo || '⚽';
               }
               listEl.classList.add('hidden');
               updateCardFromInputs();
+              refreshFormTikTokContent(true);
             };
             listEl.appendChild(row);
           });
@@ -1932,6 +2955,7 @@
     let leagueSearchTimer = null;
     function onLeagueInput(query) {
       updateCardFromInputs();
+      refreshFormTikTokContent(false);
       clearTimeout(leagueSearchTimer);
       const listEl = document.getElementById('league-autocomplete-list');
       if (!query || query.trim().length < 2) {
@@ -1968,6 +2992,7 @@
                 : l.name.toUpperCase();
               listEl.classList.add('hidden');
               updateCardFromInputs();
+              refreshFormTikTokContent(true);
             };
             listEl.appendChild(row);
           });
@@ -1978,28 +3003,104 @@
       }, 180);
     }
 
+    function getLocalDateIso(offsetDays = 0) {
+      const d = new Date();
+      d.setDate(d.getDate() + offsetDays);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
     let fixtureSearchTimer = null;
-    function searchFixturesAutocomplete(query, allowEmpty = false) {
+    function searchFixturesAutocomplete(query, allowEmpty = false, dateFilter = '') {
       clearTimeout(fixtureSearchTimer);
       const listEl = document.getElementById('fixture-autocomplete-list');
       const qTrim = (query || '').trim();
-      if (!allowEmpty && qTrim.length < 2) {
+      if (!allowEmpty && !dateFilter && qTrim.length < 2) {
         listEl.classList.add('hidden');
         return;
       }
 
       fixtureSearchTimer = setTimeout(async () => {
         try {
-          const res = await fetch(`/api/fixtures?q=${encodeURIComponent(qTrim)}&limit=25`);
+          const isUpcoming = document.getElementById('fixture-upcoming-only')?.checked !== false;
+          const limitVal = (dateFilter && !qTrim) ? 150 : 40;
+          const url = `/api/fixtures?q=${encodeURIComponent(qTrim)}&date=${encodeURIComponent(dateFilter || '')}&limit=${limitVal}&upcomingOnly=${isUpcoming}`;
+          const res = await fetch(url);
           const data = await res.json();
           const fixtures = data.results || [];
+          listEl.innerHTML = '';
+
           if (fixtures.length === 0) {
-            listEl.classList.add('hidden');
+            if (qTrim.length < 2 && !dateFilter) {
+              listEl.classList.add('hidden');
+              return;
+            }
+            const emptyBox = document.createElement('div');
+            emptyBox.className = 'p-3 text-center space-y-2';
+            const msg = document.createElement('div');
+            msg.className = 'text-[11px] text-slate-400';
+            
+            if (isUpcoming) {
+              msg.textContent = qTrim
+                ? `No hay partidos futuros (> hora actual) para "${qTrim}". Los partidos de hoy pueden haber finalizado ya:`
+                : `No hay partidos futuros para ${dateFilter}.`;
+            } else {
+              msg.textContent = qTrim
+                ? `No hay partidos locales para "${qTrim}". Si son de mañana o de otra fecha, sincroniza desde API-Football:`
+                : `No hay partidos guardados para ${dateFilter}.`;
+            }
+
+            const btnsWrap = document.createElement('div');
+            btnsWrap.className = 'flex items-center justify-center gap-2 flex-wrap';
+
+            if (isUpcoming) {
+              const showPastBtn = document.createElement('button');
+              showPastBtn.type = 'button';
+              showPastBtn.className = 'px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-semibold border border-amber-500/30 transition';
+              showPastBtn.textContent = 'Ver partidos pasados';
+              showPastBtn.onclick = () => {
+                const chk = document.getElementById('fixture-upcoming-only');
+                if (chk) chk.checked = false;
+                searchFixturesAutocomplete(query, allowEmpty, dateFilter);
+              };
+              btnsWrap.appendChild(showPastBtn);
+            }
+
+            const todayIso = getLocalDateIso(0);
+            const tomorrowIso = getLocalDateIso(1);
+            const selectedIso = document.getElementById('sync-date-input')?.value || tomorrowIso;
+
+            const makeSyncBtn = (label, targetIso, primary = false) => {
+              const b = document.createElement('button');
+              b.type = 'button';
+              b.className = primary
+                ? 'px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-semibold border border-emerald-500/30 transition'
+                : 'px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold border border-slate-700 transition';
+              b.textContent = `${label} (${targetIso})`;
+              b.onclick = () => syncDateAndSearch(targetIso);
+              return b;
+            };
+
+            btnsWrap.appendChild(makeSyncBtn('Sincronizar Hoy', todayIso, false));
+            btnsWrap.appendChild(makeSyncBtn('Sincronizar Mañana', tomorrowIso, true));
+            if (selectedIso && selectedIso !== todayIso && selectedIso !== tomorrowIso) {
+              btnsWrap.appendChild(makeSyncBtn('Sincronizar Fecha Elegida', selectedIso, false));
+            }
+
+            emptyBox.appendChild(msg);
+            emptyBox.appendChild(btnsWrap);
+            listEl.appendChild(emptyBox);
+            listEl.classList.remove('hidden');
             return;
           }
 
-          listEl.innerHTML = '';
           fixtures.forEach(f => {
+            const hName = (typeof translateTeamName === 'function') ? translateTeamName(f.home_name) : (f.home_name_es || f.home_name);
+            const aName = (typeof translateTeamName === 'function') ? translateTeamName(f.away_name) : (f.away_name_es || f.away_name);
+            const originalSubtitle = (hName !== f.home_name || aName !== f.away_name) ? ` <span class="text-slate-400 font-normal text-[10px]">(${f.home_name} vs ${f.away_name})</span>` : '';
+
             const row = document.createElement('button');
             row.type = 'button';
             row.className = 'w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between gap-2 transition';
@@ -2010,7 +3111,7 @@
                 <img src="${f.home_logo || ''}" class="w-5 h-5 object-contain shrink-0" onerror="this.style.display='none'">
                 <img src="${f.away_logo || ''}" class="w-5 h-5 object-contain shrink-0" onerror="this.style.display='none'">
                 <div class="truncate">
-                  <div class="font-bold text-white text-xs truncate">${f.home_name} vs ${f.away_name}</div>
+                  <div class="font-bold text-white text-xs truncate">${hName} vs ${aName}${originalSubtitle}</div>
                   <div class="text-[10px] text-emerald-400 truncate">${f.league_name} ${venueText ? `• 🏟️ ${venueText}` : ''} • ${dateFormatted}</div>
                 </div>
               </div>
@@ -2022,12 +3123,15 @@
               cardState.home_team_id = f.home_id || null;
               cardState.away_team_id = f.away_id || null;
 
+              const hNameEs = (typeof translateTeamName === 'function') ? translateTeamName(f.home_name) : (f.home_name_es || f.home_name);
+              const aNameEs = (typeof translateTeamName === 'function') ? translateTeamName(f.away_name) : (f.away_name_es || f.away_name);
+
               inputs.league.value = f.league_country
                 ? `${(f.league_name || '').toUpperCase()} • ${f.league_country.toUpperCase()}`
                 : (f.league_name || '').toUpperCase();
-              inputs.homeName.value = (f.home_name || '').toUpperCase();
+              inputs.homeName.value = (hNameEs || '').toUpperCase();
               inputs.homeFlag.value = f.home_logo || '⚽';
-              inputs.awayName.value = (f.away_name || '').toUpperCase();
+              inputs.awayName.value = (aNameEs || '').toUpperCase();
               inputs.awayFlag.value = f.away_logo || '⚽';
               inputs.stadium.value = venueText || 'Estadio por confirmar';
               inputs.date.value = dateFormatted;
@@ -2039,8 +3143,18 @@
               }
 
               listEl.classList.add('hidden');
-              document.getElementById('fixture-search-input').value = `${f.home_name} vs ${f.away_name}`;
+              document.getElementById('fixture-search-input').value = `${hNameEs} vs ${aNameEs}`;
+
+              const s1Val = (inputs.stat1.value || '').toUpperCase();
+              if (s1Val.includes('TOLIMA') || s1Val.includes('MILLONARIOS') || !s1Val) {
+                inputs.stat1.value = `⚡ H2H: Historial reciente y balance entre ${hNameEs} y ${aNameEs}`;
+                inputs.stat2.value = `🔥 Local: ${hNameEs} en condición de local`;
+                inputs.stat3.value = `🛡️ Visita: ${aNameEs} en condición de visitante`;
+                cardState.stats_es = [inputs.stat1.value, inputs.stat2.value, inputs.stat3.value];
+              }
+              isTikTokUserEdited = false;
               updateCardFromInputs();
+              refreshFormTikTokContent(true);
             };
             listEl.appendChild(row);
           });
@@ -2051,9 +3165,15 @@
       }, 150);
     }
 
-    async function syncApiFixtures() {
+    async function syncDateAndSearch(targetDate) {
+      const inp = document.getElementById('sync-date-input');
+      if (inp && targetDate) inp.value = targetDate;
+      await syncApiFixtures(targetDate);
+    }
+
+    async function syncApiFixtures(dateOverride = null) {
       const btn = document.getElementById('btn-sync-api');
-      const dateVal = document.getElementById('sync-date-input').value;
+      const dateVal = dateOverride || document.getElementById('sync-date-input').value;
       const origHtml = btn.innerHTML;
       btn.innerHTML = 'Sincronizando...';
       btn.disabled = true;
@@ -2067,7 +3187,8 @@
         const data = await res.json();
         if (data.success) {
           btn.innerHTML = `✅ ${data.fetched} Sincronizados`;
-          searchFixturesAutocomplete(dateVal ? dateVal.slice(5) : '');
+          const currentQuery = document.getElementById('fixture-search-input')?.value || '';
+          searchFixturesAutocomplete(currentQuery, true, dateVal);
         } else {
           alert('Aviso de API: ' + (data.error || 'Verifica RAPIDAPI_KEY en .env'));
           btn.innerHTML = origHtml;
@@ -2110,6 +3231,11 @@
         currentLang = window.__RENDER_LANG__ === 'en' ? 'en' : 'es';
         cardState.custom_pick_en = d.custom_pick_en;
         cardState.custom_pick_es = d.custom_pick_es;
+        if (!cardState.custom_pick_es || isGenericMarketName(cardState.custom_pick_es)) {
+          const autoPick = formatMarketPick(d.type_prediction_id, d.prediction_value);
+          cardState.custom_pick_es = autoPick.es;
+          cardState.custom_pick_en = autoPick.en;
+        }
         cardState.stats_en = d.stats_en;
         cardState.stats_es = d.stats_es;
 
@@ -2123,7 +3249,7 @@
         inputs.odd.value = d.odd || 1.75;
         inputs.stake.value = d.stake_bet || 8;
         inputs.confidence.value = d.probability || 70;
-        inputs.prediction.value = (currentLang === 'es' ? d.custom_pick_es : d.custom_pick_en) || d.custom_pick_es || d.custom_pick_en || '';
+        inputs.prediction.value = (currentLang === 'es' ? cardState.custom_pick_es : cardState.custom_pick_en) || cardState.custom_pick_es || cardState.custom_pick_en || '';
 
         const stats = currentLang === 'es' ? d.stats_es : d.stats_en;
         if (Array.isArray(stats)) {
@@ -2138,10 +3264,18 @@
         loadPredictionsTable(1);
       }
 
-      // Set sync date input to today
-      const todayIso = new Date().toISOString().slice(0, 10);
+      // Set sync date input to today (local date)
+      const todayIso = getLocalDateIso(0);
       const syncDateInp = document.getElementById('sync-date-input');
       if (syncDateInp) syncDateInp.value = todayIso;
+
+      // Realtime TikTok Auto-Sync listeners
+      if (inputs.odd) inputs.odd.addEventListener('input', () => { updateCardFromInputs(); refreshFormTikTokContent(false); });
+      if (inputs.confidence) inputs.confidence.addEventListener('input', () => { updateCardFromInputs(); refreshFormTikTokContent(false); });
+      if (inputs.stake) inputs.stake.addEventListener('input', () => { updateCardFromInputs(); refreshFormTikTokContent(false); });
+      if (inputs.stadium) inputs.stadium.addEventListener('input', () => { updateCardFromInputs(); refreshFormTikTokContent(false); });
+      if (inputs.tiktokCaption) inputs.tiktokCaption.addEventListener('input', () => { isTikTokUserEdited = true; });
+      if (inputs.tiktokHashtags) inputs.tiktokHashtags.addEventListener('input', () => { isTikTokUserEdited = true; });
 
       lucide.createIcons();
     }

@@ -11,6 +11,9 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+const tiktokService = require('./tiktokService');
+const { formatMarketPick, isGenericMarketName } = require('./marketFormatter');
+const { translateTeamName } = require('./teamTranslator');
 
 const SEED_CACHE_PATH = path.join(__dirname, '..', 'db', 'yii2-seed-cache.json');
 const LOCAL_STORE_PATH = path.join(__dirname, '..', 'db', 'local-store.json');
@@ -237,21 +240,147 @@ function getStatus() {
   };
 }
 
+const PG_ACCENT_FROM = 'áàäâãéèëêíìïîóòöôõúùüûñçğşı';
+const PG_ACCENT_TO   = 'aaaaaeeeeiiiiooooouuuuncgsi';
+
+const SEARCH_ALIASES = {
+  'turkey': ['turkiye', 'turquia'],
+  'turquia': ['turkiye', 'turkey'],
+  'turkiye': ['turkey', 'turquia'],
+  'czech republic': ['czechia', 'republica checa'],
+  'republica checa': ['czechia', 'czech republic'],
+  'czechia': ['czech republic', 'republica checa'],
+  'inglaterra': ['england'],
+  'england': ['inglaterra'],
+  'espana': ['spain'],
+  'spain': ['espana'],
+  'francia': ['france'],
+  'france': ['francia'],
+  'italia': ['italy'],
+  'italy': ['italia'],
+  'belgica': ['belgium'],
+  'belgium': ['belgica'],
+  'croacia': ['croatia'],
+  'croatia': ['croacia'],
+  'finlandia': ['finland'],
+  'finland': ['finlandia'],
+  'bielorrusia': ['belarus'],
+  'belarus': ['bielorrusia'],
+  'letonia': ['latvia'],
+  'latvia': ['letonia'],
+  'chipre': ['cyprus'],
+  'cyprus': ['chipre'],
+  'alemania': ['germany'],
+  'germany': ['alemania'],
+  'paises bajos': ['netherlands'],
+  'holanda': ['netherlands'],
+  'netherlands': ['paises bajos', 'holanda'],
+  'suiza': ['switzerland'],
+  'suecia': ['sweden'],
+  'noruega': ['norway'],
+  'dinamarca': ['denmark'],
+  'grecia': ['greece'],
+  'escocia': ['scotland'],
+  'gales': ['wales'],
+  'irlanda': ['ireland'],
+  'marruecos': ['morocco'],
+  'costa de marfil': ['ivory coast'],
+  'brasil': ['brazil'],
+  'estados unidos': ['usa'],
+  'unl': ['uefa nations league', 'nations league'],
+  'ucl': ['uefa champions league', 'champions league'],
+  'uel': ['uefa europa league', 'europa league']
+};
+
+function pgNormalizeSql(exprSql) {
+  return `TRANSLATE(LOWER(${exprSql}), '${PG_ACCENT_FROM}', '${PG_ACCENT_TO}')`;
+}
+
+function normalizeSearchText(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ğ/g, 'g')
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .toLowerCase()
+    .trim();
+}
+
+function buildSearchTokenGroups(rawQuery) {
+  const norm = normalizeSearchText(rawQuery);
+  if (!norm) return [];
+
+  const sortedKeys = Object.keys(SEARCH_ALIASES).sort((a, b) => b.length - a.length);
+  const groups = [];
+  const parts = norm.split(/\s+(?:vs\.?|v|-)\s+/i).map(p => p.trim()).filter(Boolean);
+
+  for (const part of parts) {
+    if (SEARCH_ALIASES[part]) {
+      groups.push(Array.from(new Set([part, ...SEARCH_ALIASES[part]])));
+      continue;
+    }
+    let temp = part;
+    for (const key of sortedKeys) {
+      if (key.includes(' ') && temp.includes(key)) {
+        groups.push(Array.from(new Set([key, ...SEARCH_ALIASES[key]])));
+        temp = temp.replace(key, ' ').trim();
+      }
+    }
+    const words = temp.split(/\s+/).filter(w => w && w !== 'vs' && w !== 'de' && w !== 'la');
+    for (const w of words) {
+      if (SEARCH_ALIASES[w]) {
+        groups.push(Array.from(new Set([w, ...SEARCH_ALIASES[w]])));
+      } else {
+        groups.push([w]);
+      }
+    }
+  }
+  return groups;
+}
+
+function buildPgGroupsWhere(searchableSql, groups, params) {
+  if (!groups || groups.length === 0) return 'TRUE';
+  const andClauses = groups.map(variants => {
+    const orClauses = variants.map(v => {
+      params.push(`%${v}%`);
+      return `${searchableSql} LIKE $${params.length}`;
+    });
+    return `(${orClauses.join(' OR ')})`;
+  });
+  return andClauses.join(' AND ');
+}
+
+function matchesTokenGroups(textFields, groups) {
+  if (!groups || groups.length === 0) return true;
+  const hay = normalizeSearchText(textFields.filter(Boolean).join(' '));
+  return groups.every(variants => variants.some(v => hay.includes(v)));
+}
+
+function getTodayBogotaIso() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: process.env.DEFAULT_TIMEZONE || 'America/Bogota' });
+}
+
 async function searchTeams({ q = '', limit = 25 } = {}) {
   loadFallbackData();
   const term = String(q).trim().toLowerCase();
+  const groups = buildSearchTokenGroups(q);
 
   if (pgAvailable) {
     try {
+      const params = [];
+      const searchableSql = pgNormalizeSql("COALESCE(t.name, '') || ' ' || COALESCE(t.country, '')");
+      const qWhere = buildPgGroupsWhere(searchableSql, groups, params);
+      params.push(Number(limit));
       const res = await pool.query(
         `SELECT t.id, t.name, t.country, t.logo, t.venue_id,
                 v.name AS venue_name, v.city AS venue_city
          FROM teams t
          LEFT JOIN venues v ON v.id = t.venue_id
-         WHERE ($1 = '' OR LOWER(t.name) LIKE $2 OR LOWER(COALESCE(t.country, '')) LIKE $2)
+         WHERE ${qWhere}
          ORDER BY CASE WHEN t.venue_id IS NOT NULL THEN 0 ELSE 1 END, t.id ASC
-         LIMIT $3`,
-        [term, `%${term}%`, Number(limit)]
+         LIMIT $${params.length}`,
+        params
       );
       return res.rows;
     } catch (e) {
@@ -260,16 +389,12 @@ async function searchTeams({ q = '', limit = 25 } = {}) {
   }
 
   let results = seedCache.teams;
-  if (term) {
-    results = results.filter(
-      t =>
-        (t.name && t.name.toLowerCase().includes(term)) ||
-        (t.country && t.country.toLowerCase().includes(term))
-    );
+  if (groups.length > 0) {
+    results = results.filter(t => matchesTokenGroups([t.name, t.country], groups));
     // Prioritize exact prefix matches and teams with venues
     results.sort((a, b) => {
-      const aStarts = a.name && a.name.toLowerCase().startsWith(term) ? 0 : 1;
-      const bStarts = b.name && b.name.toLowerCase().startsWith(term) ? 0 : 1;
+      const aStarts = a.name && normalizeSearchText(a.name).startsWith(normalizeSearchText(term)) ? 0 : 1;
+      const bStarts = b.name && normalizeSearchText(b.name).startsWith(normalizeSearchText(term)) ? 0 : 1;
       if (aStarts !== bStarts) return aStarts - bStarts;
       const aHasVenue = a.venue_id ? 0 : 1;
       const bHasVenue = b.venue_id ? 0 : 1;
@@ -298,18 +423,22 @@ async function searchTeams({ q = '', limit = 25 } = {}) {
 
 async function searchLeagues({ q = '', limit = 30 } = {}) {
   loadFallbackData();
-  const term = String(q).trim().toLowerCase();
+  const groups = buildSearchTokenGroups(q);
 
   if (pgAvailable) {
     try {
+      const params = [];
+      const searchableSql = pgNormalizeSql("COALESCE(l.name, '') || ' ' || COALESCE(c.name, '')");
+      const qWhere = buildPgGroupsWhere(searchableSql, groups, params);
+      params.push(Number(limit));
       const res = await pool.query(
         `SELECT l.id, l.name, l.type, l.logo, c.name AS country_name, c.flag AS country_flag
          FROM leagues l
          LEFT JOIN countries c ON c.id = l.country_id
-         WHERE ($1 = '' OR LOWER(l.name) LIKE $2 OR LOWER(COALESCE(c.name, '')) LIKE $2)
+         WHERE ${qWhere}
          ORDER BY l.id ASC
-         LIMIT $3`,
-        [term, `%${term}%`, Number(limit)]
+         LIMIT $${params.length}`,
+        params
       );
       return res.rows;
     } catch (e) {
@@ -318,13 +447,10 @@ async function searchLeagues({ q = '', limit = 30 } = {}) {
   }
 
   let results = seedCache.leagues;
-  if (term) {
+  if (groups.length > 0) {
     results = results.filter(l => {
       const c = l.country_id ? seedCache.countriesById.get(l.country_id) : null;
-      return (
-        (l.name && l.name.toLowerCase().includes(term)) ||
-        (c && c.name && c.name.toLowerCase().includes(term))
-      );
+      return matchesTokenGroups([l.name, c ? c.name : ''], groups);
     });
   }
 
@@ -372,13 +498,34 @@ async function getTypePredictions() {
   });
 }
 
-async function searchFixtures({ q = '', date = '', limit = 30 } = {}) {
+async function searchFixtures({ q = '', date = '', limit = 30, upcomingOnly = true } = {}) {
   loadFallbackData();
-  const term = String(q).trim().toLowerCase();
   const datePrefix = String(date).trim();
+  const groups = buildSearchTokenGroups(q);
+  const todayBogota = getTodayBogotaIso();
+  const isUpcoming = String(upcomingOnly) !== 'false' && String(upcomingOnly) !== '0';
+  const nowEpoch = Math.floor(Date.now() / 1000) - 300; // 5 min grace window
 
   if (pgAvailable) {
     try {
+      const params = [datePrefix, `${datePrefix}%`, todayBogota];
+      const searchableSql = pgNormalizeSql(
+        "COALESCE(th.name, '') || ' ' || COALESCE(ta.name, '') || ' ' || COALESCE(l.name, '') || ' ' || COALESCE(c.name, '') || ' ' || COALESCE(th.country, '')"
+      );
+      const qWhere = buildPgGroupsWhere(searchableSql, groups, params);
+
+      let upcomingWhere = 'TRUE';
+      if (isUpcoming) {
+        params.push(nowEpoch);
+        upcomingWhere = `(
+          (f.timestamp IS NOT NULL AND f.timestamp >= $${params.length}) OR
+          (f.timestamp IS NULL AND f.date >= (NOW() AT TIME ZONE 'America/Bogota') - INTERVAL '5 minutes')
+        )`;
+      }
+
+      params.push(Number(limit));
+      const limitParam = `$${params.length}`;
+
       const res = await pool.query(
         `SELECT f.id,
                 f.date,
@@ -407,13 +554,22 @@ async function searchFixtures({ q = '', date = '', limit = 30 } = {}) {
          LEFT JOIN countries c ON c.id = l.country_id
          LEFT JOIN venues v ON v.id = COALESCE(f.venue_id, th.venue_id)
          LEFT JOIN fixtures_status fs ON fs.id = f.status_id
-         WHERE ($1 = '' OR LOWER(th.name) LIKE $2 OR LOWER(ta.name) LIKE $2 OR LOWER(l.name) LIKE $2 OR LOWER(COALESCE(c.name, '')) LIKE $2)
-           AND ($3 = '' OR TO_CHAR(f.date, 'YYYY-MM-DD') LIKE $4)
-         ORDER BY CASE WHEN COALESCE(f.venue_name, v.name) IS NOT NULL THEN 0 ELSE 1 END, f.date DESC NULLS LAST
-         LIMIT $5`,
-        [term, `%${term}%`, datePrefix, `${datePrefix}%`, Number(limit)]
+         WHERE ($1 = '' OR TO_CHAR(f.date, 'YYYY-MM-DD') LIKE $2)
+           AND (${qWhere})
+           AND (${upcomingWhere})
+         ORDER BY
+           CASE WHEN TO_CHAR(f.date, 'YYYY-MM-DD') >= $3 THEN 0 ELSE 1 END ASC,
+           CASE WHEN TO_CHAR(f.date, 'YYYY-MM-DD') >= $3 THEN f.date ELSE NULL END ASC NULLS LAST,
+           f.date DESC NULLS LAST,
+           CASE WHEN COALESCE(f.venue_name, v.name) IS NOT NULL THEN 0 ELSE 1 END ASC
+         LIMIT ${limitParam}`,
+        params
       );
-      return res.rows;
+      return res.rows.map(r => ({
+        ...r,
+        home_name_es: translateTeamName(r.home_name, 'es'),
+        away_name_es: translateTeamName(r.away_name, 'es')
+      }));
     } catch (e) {
       console.warn('PG searchFixtures fallback:', e.message);
     }
@@ -455,29 +611,51 @@ async function searchFixtures({ q = '', date = '', limit = 30 } = {}) {
   if (datePrefix) {
     list = list.filter(f => f.date && String(f.date).startsWith(datePrefix));
   }
-  if (term) {
-    list = list.filter(
-      f =>
-        (f.home_name && f.home_name.toLowerCase().includes(term)) ||
-        (f.away_name && f.away_name.toLowerCase().includes(term)) ||
-        (f.league_name && f.league_name.toLowerCase().includes(term)) ||
-        (f.league_country && f.league_country.toLowerCase().includes(term))
+  if (isUpcoming) {
+    list = list.filter(f => {
+      if (f.timestamp) return Number(f.timestamp) >= nowEpoch;
+      if (f.date) return new Date(f.date).getTime() >= (Date.now() - 300000);
+      return true;
+    });
+  }
+  if (groups.length > 0) {
+    list = list.filter(f =>
+      matchesTokenGroups([f.home_name, f.away_name, f.league_name, f.league_country], groups)
     );
   }
-  return list.slice(0, Number(limit));
+  list.sort((a, b) => {
+    const aDateStr = String(a.date || '').slice(0, 10);
+    const bDateStr = String(b.date || '').slice(0, 10);
+    const aUp = aDateStr >= todayBogota ? 0 : 1;
+    const bUp = bDateStr >= todayBogota ? 0 : 1;
+    if (aUp !== bUp) return aUp - bUp;
+    const aTime = a.date ? new Date(a.date).getTime() : 0;
+    const bTime = b.date ? new Date(b.date).getTime() : 0;
+    return aUp === 0 ? aTime - bTime : bTime - aTime;
+  });
+  return list.slice(0, Number(limit)).map(r => ({
+    ...r,
+    home_name_es: translateTeamName(r.home_name, 'es'),
+    away_name_es: translateTeamName(r.away_name, 'es')
+  }));
 }
 
 async function saveSyncedFixtures(apiFixtures) {
   loadFallbackData();
   const existingById = new Map((localStore.fixtures || []).map(f => [f.id, f]));
 
+  const trunc = (val, max) => (val ? String(val).slice(0, max) : null);
+
   for (const item of apiFixtures) {
+    const rawVenueId = item.fixture && item.fixture.venue ? Number(item.fixture.venue.id) : 0;
+    const safeVenueId = Number.isFinite(rawVenueId) && rawVenueId > 0 ? rawVenueId : null;
+
     const mapped = {
       id: item.fixture.id,
       date: item.fixture.date,
       timestamp: item.fixture.timestamp,
       timezone: item.fixture.timezone,
-      venue_id: item.fixture.venue ? item.fixture.venue.id : null,
+      venue_id: safeVenueId,
       venue_name: item.fixture.venue ? item.fixture.venue.name : null,
       venue_city: item.fixture.venue ? item.fixture.venue.city : null,
       status_short: item.fixture.status ? item.fixture.status.short : 'NS',
@@ -496,27 +674,27 @@ async function saveSyncedFixtures(apiFixtures) {
 
     if (pgAvailable) {
       try {
-        if (mapped.venue_id && mapped.venue_name) {
+        if (mapped.venue_id) {
           await pool.query(
             `INSERT INTO venues (id, name, city) VALUES ($1, $2, $3)
-             ON CONFLICT (id) DO UPDATE SET name = COALESCE(EXCLUDED.name, venues.name), city = COALESCE(EXCLUDED.city, venues.city)`,
-            [mapped.venue_id, mapped.venue_name, mapped.venue_city]
+             ON CONFLICT (id) DO UPDATE SET name = COALESCE(NULLIF(EXCLUDED.name, ''), venues.name), city = COALESCE(EXCLUDED.city, venues.city)`,
+            [mapped.venue_id, trunc(mapped.venue_name, 255) || 'Estadio por confirmar', trunc(mapped.venue_city, 120)]
           );
         }
         await pool.query(
           `INSERT INTO leagues (id, name, type, logo) VALUES ($1, $2, 'League', $3)
            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, logo = COALESCE(EXCLUDED.logo, leagues.logo)`,
-          [mapped.league_id, mapped.league_name || 'League', mapped.league_logo || '']
+          [mapped.league_id, trunc(mapped.league_name, 150) || 'League', trunc(mapped.league_logo, 255) || '']
         );
         await pool.query(
           `INSERT INTO teams (id, name, country, logo, venue_id) VALUES ($1, $2, $3, $4, $5)
            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, logo = COALESCE(EXCLUDED.logo, teams.logo), venue_id = COALESCE(teams.venue_id, EXCLUDED.venue_id)`,
-          [mapped.home_id, mapped.home_name, mapped.league_country, mapped.home_logo, mapped.venue_id]
+          [mapped.home_id, trunc(mapped.home_name, 120) || 'Home', trunc(mapped.league_country, 120), trunc(mapped.home_logo, 255), mapped.venue_id]
         );
         await pool.query(
           `INSERT INTO teams (id, name, country, logo) VALUES ($1, $2, $3, $4)
            ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, logo = COALESCE(EXCLUDED.logo, teams.logo)`,
-          [mapped.away_id, mapped.away_name, mapped.league_country, mapped.away_logo]
+          [mapped.away_id, trunc(mapped.away_name, 120) || 'Away', trunc(mapped.league_country, 120), trunc(mapped.away_logo, 255)]
         );
         await pool.query(
           `INSERT INTO fixtures (
@@ -531,13 +709,13 @@ async function saveSyncedFixtures(apiFixtures) {
              venue_city = COALESCE(EXCLUDED.venue_city, fixtures.venue_city)`,
           [
             mapped.id,
-            item.fixture.referee || null,
-            mapped.timezone || 'America/Bogota',
+            trunc(item.fixture.referee, 120),
+            trunc(mapped.timezone, 50) || 'America/Bogota',
             mapped.date || null,
             mapped.timestamp || null,
-            mapped.venue_id || null,
-            mapped.venue_name || null,
-            mapped.venue_city || null,
+            mapped.venue_id,
+            trunc(mapped.venue_name, 255),
+            trunc(mapped.venue_city, 120),
             item.goals ? item.goals.home : null,
             item.goals ? item.goals.away : null,
             mapped.home_id,
@@ -546,7 +724,7 @@ async function saveSyncedFixtures(apiFixtures) {
           ]
         );
       } catch (e) {
-        // continue
+        console.warn('PG saveSyncedFixtures item error:', mapped.id, e.message);
       }
     }
   }
@@ -554,6 +732,17 @@ async function saveSyncedFixtures(apiFixtures) {
   localStore.fixtures = Array.from(existingById.values());
   saveLocalStore();
   return localStore.fixtures.length;
+}
+
+function enrichWithTikTok(pred) {
+  if (!pred) return pred;
+  if (!pred.tiktok_caption || !pred.tiktok_hashtags || tiktokService.isTikTokContentMismatched(pred, pred.tiktok_caption, pred.tiktok_hashtags)) {
+    const generated = tiktokService.generateTikTokContent(pred);
+    pred.tiktok_caption = generated.caption;
+    pred.tiktok_hashtags = generated.hashtags;
+  }
+  pred.tiktok_full_text = `${pred.tiktok_caption || ''}\n\n${pred.tiktok_hashtags || ''}`.trim();
+  return pred;
 }
 
 async function getPredictions({ page = 1, limit = 10, search = '' } = {}) {
@@ -582,7 +771,7 @@ async function getPredictions({ page = 1, limit = 10, search = '' } = {}) {
       
       const dataRes = await pool.query(dataQuery, [...params, limitNum, offset]);
       return {
-        results: dataRes.rows,
+        results: dataRes.rows.map(enrichWithTikTok),
         total,
         page: pageNum,
         limit: limitNum,
@@ -605,7 +794,7 @@ async function getPredictions({ page = 1, limit = 10, search = '' } = {}) {
     );
   }
   const total = list.length;
-  const paginated = list.slice(offset, offset + limitNum);
+  const paginated = list.slice(offset, offset + limitNum).map(enrichWithTikTok);
   return {
     results: paginated,
     total,
@@ -621,12 +810,13 @@ async function getPredictionById(id) {
   if (pgAvailable) {
     try {
       const res = await pool.query('SELECT * FROM predictions WHERE id = $1', [numId]);
-      if (res.rows[0]) return res.rows[0];
+      if (res.rows[0]) return enrichWithTikTok(res.rows[0]);
     } catch (e) {
       // fallback
     }
   }
-  return localStore.predictions.find(p => Number(p.id) === numId) || null;
+  const found = localStore.predictions.find(p => Number(p.id) === numId);
+  return found ? enrichWithTikTok(found) : null;
 }
 
 async function savePrediction(payload) {
@@ -669,10 +859,32 @@ async function savePrediction(payload) {
     was_right: payload.was_right !== undefined ? Number(payload.was_right) : 2,
     stats_en: Array.isArray(payload.stats_en) ? payload.stats_en : [],
     stats_es: Array.isArray(payload.stats_es) ? payload.stats_es : [],
+    tiktok_caption: payload.tiktok_caption || null,
+    tiktok_hashtags: payload.tiktok_hashtags || null,
     theme: payload.theme || 'emerald',
     created_at: payload.created_at || new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
+
+  // If pick text is missing or generic (e.g. just "Clásico"), compute actual prediction label
+  if (!record.custom_pick_es || isGenericMarketName(record.custom_pick_es)) {
+    const formatted = formatMarketPick(
+      record.type_prediction_id,
+      record.prediction_value
+    );
+    record.custom_pick_es = formatted.es;
+    if (!record.custom_pick_en || isGenericMarketName(record.custom_pick_en)) {
+      record.custom_pick_en = formatted.en;
+    }
+  }
+
+  // Auto-generate or re-sync TikTok caption and hashtags if missing or mismatched
+  if (!record.tiktok_caption || !record.tiktok_hashtags || tiktokService.isTikTokContentMismatched(record, record.tiktok_caption, record.tiktok_hashtags)) {
+    const generated = tiktokService.generateTikTokContent(record);
+    record.tiktok_caption = generated.caption;
+    record.tiktok_hashtags = generated.hashtags;
+  }
+  record.tiktok_full_text = `${record.tiktok_caption}\n\n${record.tiktok_hashtags}`.trim();
 
   if (pgAvailable) {
     try {
@@ -689,8 +901,9 @@ async function savePrediction(payload) {
             odd = $18, stake_bet = $19, probability = $20,
             is_vip = $21, was_right = $22,
             stats_en = $23, stats_es = $24, theme = $25,
+            tiktok_caption = $26, tiktok_hashtags = $27,
             updated_at = CURRENT_TIMESTAMP
-          WHERE id = $26 RETURNING *`,
+          WHERE id = $28 RETURNING *`,
           [
             record.fixture_id, record.league_id, record.league_name, record.league_logo,
             record.home_team_id, record.home_name, record.home_flag,
@@ -701,7 +914,7 @@ async function savePrediction(payload) {
             record.odd, record.stake_bet, record.probability,
             record.is_vip, record.was_right,
             JSON.stringify(record.stats_en), JSON.stringify(record.stats_es),
-            record.theme, record.id
+            record.theme, record.tiktok_caption, record.tiktok_hashtags, record.id
           ]
         );
         if (res.rows[0]) record.id = res.rows[0].id;
@@ -715,9 +928,9 @@ async function savePrediction(payload) {
             stadium, match_date_text, match_date,
             type_prediction_id, prediction_value, custom_pick_en, custom_pick_es,
             odd, stake_bet, probability, is_vip, was_right,
-            stats_en, stats_es, theme
+            stats_en, stats_es, theme, tiktok_caption, tiktok_hashtags
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
           ) RETURNING *`,
           [
             record.fixture_id, record.league_id, record.league_name, record.league_logo,
@@ -729,7 +942,7 @@ async function savePrediction(payload) {
             record.odd, record.stake_bet, record.probability,
             record.is_vip, record.was_right,
             JSON.stringify(record.stats_en), JSON.stringify(record.stats_es),
-            record.theme
+            record.theme, record.tiktok_caption, record.tiktok_hashtags
           ]
         );
         if (res.rows[0]) record.id = res.rows[0].id;

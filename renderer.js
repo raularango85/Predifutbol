@@ -347,10 +347,10 @@ async function renderVideoFrames({ page, context, finalPath, onFrame }) {
  * @param {Object} options.cardData - Match card data payload from the studio UI
  * @param {'png'|'video'} [options.format='png'] - Export format
  * @param {string[]} [options.langs=['en']] - Languages to export ('en', 'es')
- * @param {number} [options.port=3000] - Local Express server port
+ * @param {number} [options.port=3001] - Local Express server port
  * @param {Function} [options.onProgress] - Callback ({ percent, stage, frame, totalFrames, etaSec })
  */
-async function exportCardAssets({ cardData, format = 'png', langs = ['en'], port = process.env.PORT || 3000, onProgress }) {
+async function exportCardAssets({ cardData, format = 'png', langs = ['en'], port = process.env.PORT || 3001, onProgress }) {
   ensureExportsDir();
 
   const report = info => {

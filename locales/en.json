@@ -22,7 +22,7 @@
     "market_value": "Pick Value",
     "custom_pick": "Displayed Pick Text (Auto or Custom)",
     "odd_input": "Odd / Quota",
-    "stake_input": "Stake (1-10)",
+    "stake_input": "Confidence Level (1-10)",
     "confidence_rate": "Probability / Confidence Rate",
     "theme_label": "Card Accent Theme",
     "save_card": "Save Match Card",
@@ -36,7 +36,7 @@
     "key_match_data": "Key Match Data",
     "value_prediction": "Value Prediction",
     "odd_badge": "ODD",
-    "stake_badge": "STAKE",
+    "stake_badge": "CONFIDENCE",
     "cta_footer": "Follow us on TikTok @predifutbolcolombia"
   },
   "markets": {

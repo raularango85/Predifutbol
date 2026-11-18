@@ -77,7 +77,7 @@ node server.js
 
 Abre tu navegador en:
 ```
-http://localhost:3000
+http://localhost:3001
 ```
 
 ---
