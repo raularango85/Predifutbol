@@ -3,8 +3,12 @@ package media
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -28,9 +32,10 @@ type MediaRenderer struct {
 	audioService *audio.AudioService
 	fps          int
 	durationSec  int
+	baseDir      string
 }
 
-func NewMediaRenderer(ffmpegPath, exportsDir string, audioService *audio.AudioService) *MediaRenderer {
+func NewMediaRenderer(ffmpegPath, exportsDir string, audioService *audio.AudioService, baseDir ...string) *MediaRenderer {
 	if ffmpegPath == "" {
 		if path, err := exec.LookPath("ffmpeg"); err == nil {
 			ffmpegPath = path
@@ -41,13 +46,108 @@ func NewMediaRenderer(ffmpegPath, exportsDir string, audioService *audio.AudioSe
 			}
 		}
 	}
+	bDir := ""
+	if len(baseDir) > 0 {
+		bDir = baseDir[0]
+	}
 	return &MediaRenderer{
 		ffmpegPath:   ffmpegPath,
 		exportsDir:   exportsDir,
 		audioService: audioService,
 		fps:          30,
 		durationSec:  15,
+		baseDir:      bDir,
 	}
+}
+
+var imageClient = &http.Client{
+	Timeout: 4 * time.Second,
+}
+
+// ResolveImageToDataURL resolves remote URLs (via HTTP GET) and local file paths
+// into synchronous base64 data URIs so Chromium renders them instantly without network delays or empty boxes.
+func ResolveImageToDataURL(ctx context.Context, urlOrPath, baseDir string) string {
+	val := strings.TrimSpace(urlOrPath)
+	if val == "" {
+		return val
+	}
+	if strings.HasPrefix(val, "data:") {
+		return val
+	}
+
+	// 1. Remote HTTP/HTTPS URL
+	if strings.HasPrefix(val, "http://") || strings.HasPrefix(val, "https://") {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, val, nil)
+		if err != nil {
+			return val
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) PrediFutbol/2.0")
+
+		resp, err := imageClient.Do(req)
+		if err != nil {
+			slog.Warn("Failed to pre-fetch image URL", slog.String("url", val), slog.String("error", err.Error()))
+			return val
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			slog.Warn("Image URL returned non-200", slog.String("url", val), slog.Int("status", resp.StatusCode))
+			return val
+		}
+
+		data, err := io.ReadAll(resp.Body)
+		if err != nil || len(data) == 0 {
+			return val
+		}
+
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == "" || contentType == "application/octet-stream" {
+			contentType = http.DetectContentType(data)
+		}
+		if contentType == "" {
+			contentType = "image/png"
+		}
+
+		encoded := base64.StdEncoding.EncodeToString(data)
+		return fmt.Sprintf("data:%s;base64,%s", contentType, encoded)
+	}
+
+	// 2. Local file path
+	cleanPath := strings.TrimPrefix(val, "/")
+	cleanPath = strings.TrimPrefix(cleanPath, "\\")
+	subPath := strings.TrimPrefix(cleanPath, "public/")
+	subPath = strings.TrimPrefix(subPath, "public\\")
+	subPath = strings.TrimPrefix(subPath, "images/")
+	subPath = strings.TrimPrefix(subPath, "images\\")
+
+	candidates := []string{
+		filepath.Join(baseDir, cleanPath),
+		filepath.Join(baseDir, "public", subPath),
+		filepath.Join(baseDir, "frontend", "public", subPath),
+		filepath.Join(baseDir, "images", subPath),
+		filepath.Join(baseDir, "frontend", "public", "public", subPath),
+	}
+	for _, cand := range candidates {
+		if fi, err := os.Stat(cand); err == nil && !fi.IsDir() {
+			data, err := os.ReadFile(cand)
+			if err == nil && len(data) > 0 {
+				ext := strings.ToLower(filepath.Ext(cand))
+				mime := "image/png"
+				switch ext {
+				case ".svg":
+					mime = "image/svg+xml"
+				case ".jpg", ".jpeg":
+					mime = "image/jpeg"
+				case ".webp":
+					mime = "image/webp"
+				}
+				encoded := base64.StdEncoding.EncodeToString(data)
+				return fmt.Sprintf("data:%s;base64,%s", mime, encoded)
+			}
+		}
+	}
+
+	return val
 }
 
 var slugRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
@@ -249,9 +349,21 @@ func (r *MediaRenderer) Render(ctx context.Context, opts ExportOptions) ([]domai
 	matchSlug := fmt.Sprintf("%s_vs_%s", SanitizeSlug(opts.Prediction.HomeName), SanitizeSlug(opts.Prediction.AwayName))
 	ts := fmt.Sprintf("%05d", time.Now().UnixNano()%100000)
 
+	report(1.0, "Preparando escudos y recursos gráficos en alta resolución...", 0, 0, nil)
+
+	// Pre-resolve team crests and league logo to base64 data URIs before launching Chromium
+	predCopy := *opts.Prediction
+	predCopy.HomeFlag = ResolveImageToDataURL(ctx, predCopy.HomeFlag, r.baseDir)
+	predCopy.AwayFlag = ResolveImageToDataURL(ctx, predCopy.AwayFlag, r.baseDir)
+	if predCopy.LeagueLogo != nil && *predCopy.LeagueLogo != "" {
+		resLogo := ResolveImageToDataURL(ctx, *predCopy.LeagueLogo, r.baseDir)
+		predCopy.LeagueLogo = &resLogo
+	}
+
 	outputFiles := make([]domain.ExportFile, 0, len(langs))
-	cardJSON, _ := json.Marshal(opts.Prediction)
-	encodedData := url.QueryEscape(string(cardJSON))
+	cardJSON, _ := json.Marshal(predCopy)
+	cardJSONStr := string(cardJSON)
+	encodedData := url.QueryEscape(cardJSONStr)
 
 	for langIdx, lang := range langs {
 		langUpper := strings.ToUpper(lang)
@@ -270,7 +382,24 @@ func (r *MediaRenderer) Render(ctx context.Context, opts ExportOptions) ([]domai
 			err := chromedp.Do(tabCtx,
 				chromedp.EmulateViewport(540, 960, chromedp.EmulateScale(2.0), chromedp.EmulatePortrait),
 				chromedp.Navigate(pngURL),
-				chromedp.Sleep(700*time.Millisecond),
+				chromedp.Evaluate[chromedp.Void](fmt.Sprintf(`
+					window.__RENDER_CARD_DATA__ = %s;
+					if (window.__vtSetCard) { window.__vtSetCard(%s); }
+				`, cardJSONStr, cardJSONStr)),
+				chromedp.Sleep(500*time.Millisecond),
+				chromedp.Evaluate[chromedp.Void](`
+					(async () => {
+						try {
+							const imgs = Array.from(document.images);
+							await Promise.all(imgs.map(img => {
+								if (img.decode) return img.decode().catch(() => {});
+								if (img.complete) return Promise.resolve();
+								return new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 2000); });
+							}));
+						} catch (e) {}
+					})()
+				`),
+				chromedp.Sleep(200*time.Millisecond),
 				chromedp.Evaluate[chromedp.Void]("window.__vtInstantFinalState && window.__vtInstantFinalState();"),
 			)
 			if err != nil {
@@ -357,7 +486,24 @@ func (r *MediaRenderer) Render(ctx context.Context, opts ExportOptions) ([]domai
 			err = chromedp.Do(tabCtx,
 				chromedp.EmulateViewport(540, 960, chromedp.EmulateScale(2.0), chromedp.EmulatePortrait),
 				chromedp.Navigate(targetURL),
-				chromedp.Sleep(800*time.Millisecond),
+				chromedp.Evaluate[chromedp.Void](fmt.Sprintf(`
+					window.__RENDER_CARD_DATA__ = %s;
+					if (window.__vtSetCard) { window.__vtSetCard(%s); }
+				`, cardJSONStr, cardJSONStr)),
+				chromedp.Sleep(600*time.Millisecond),
+				chromedp.Evaluate[chromedp.Void](`
+					(async () => {
+						try {
+							const imgs = Array.from(document.images);
+							await Promise.all(imgs.map(img => {
+								if (img.decode) return img.decode().catch(() => {});
+								if (img.complete) return Promise.resolve();
+								return new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 2000); });
+							}));
+						} catch (e) {}
+					})()
+				`),
+				chromedp.Sleep(200*time.Millisecond),
 				chromedp.Evaluate[chromedp.Void](virtualClockScript),
 			)
 			if err != nil {

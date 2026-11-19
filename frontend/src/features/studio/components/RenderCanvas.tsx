@@ -11,12 +11,28 @@ declare global {
     __vtAdvanceTo?: (ms: number) => number;
     __vtSceneAdvanceTo?: (ms: number) => number;
     __vtInstantFinalState?: () => void;
+    __vtSetCard?: (card: CardState) => void;
   }
 }
 
+const isImageSrc = (str?: string) => {
+  if (!str) return false;
+  return str.startsWith('http://') || str.startsWith('https://') || str.startsWith('data:') || str.startsWith('/') || str.endsWith('.png') || str.endsWith('.jpg') || str.endsWith('.svg');
+};
+
 export const RenderCanvas: React.FC = () => {
-  const [card, setCard] = useState<CardState>(DEFAULT_CARD_STATE);
-  const [lang, setLang] = useState<'es' | 'en'>('es');
+  const [card, setCard] = useState<CardState>(() => {
+    if (typeof window !== 'undefined' && window.__RENDER_CARD_DATA__) {
+      return window.__RENDER_CARD_DATA__;
+    }
+    return DEFAULT_CARD_STATE;
+  });
+  const [lang, setLang] = useState<'es' | 'en'>(() => {
+    if (typeof window !== 'undefined' && (window.__RENDER_LANG__ === 'en' || window.__RENDER_LANG__ === 'es')) {
+      return window.__RENDER_LANG__;
+    }
+    return 'es';
+  });
 
   // DOM Refs for synchronous frame-by-frame updates without React batching latency
   const splashRef = useRef<HTMLDivElement>(null);
@@ -36,6 +52,10 @@ export const RenderCanvas: React.FC = () => {
     if (window.__RENDER_LANG__) {
       setLang(window.__RENDER_LANG__);
     }
+
+    window.__vtSetCard = (newCard: CardState) => {
+      setCard(newCard);
+    };
 
     // 2. URL search params fallback
     const params = new URLSearchParams(window.location.search);
@@ -244,8 +264,10 @@ export const RenderCanvas: React.FC = () => {
             {/* Home Side */}
             <div className="flex flex-col items-center w-28 space-y-1 intro-home-anim text-center">
               <div className="w-12 h-12 rounded-xl glass-pill flex items-center justify-center p-1.5 border border-white/15 shadow-inner">
-                {card.home_flag ? (
+                {isImageSrc(card.home_flag) ? (
                   <img src={card.home_flag} alt={card.home_name} className="max-w-full max-h-full object-contain drop-shadow" />
+                ) : card.home_flag ? (
+                  <span className="text-2xl select-none">{card.home_flag}</span>
                 ) : (
                   <Shield className="w-7 h-7 text-emerald-400" />
                 )}
@@ -263,8 +285,10 @@ export const RenderCanvas: React.FC = () => {
             {/* Away Side */}
             <div className="flex flex-col items-center w-28 space-y-1 intro-away-anim text-center">
               <div className="w-12 h-12 rounded-xl glass-pill flex items-center justify-center p-1.5 border border-white/15 shadow-inner">
-                {card.away_flag ? (
+                {isImageSrc(card.away_flag) ? (
                   <img src={card.away_flag} alt={card.away_name} className="max-w-full max-h-full object-contain drop-shadow" />
+                ) : card.away_flag ? (
+                  <span className="text-2xl select-none">{card.away_flag}</span>
                 ) : (
                   <Shield className="w-7 h-7 text-cyan-400" />
                 )}
@@ -329,8 +353,10 @@ export const RenderCanvas: React.FC = () => {
               {/* Home Team */}
               <div className="col-span-2 flex flex-col items-center space-y-1.5">
                 <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl glass-pill flex items-center justify-center p-2.5 border border-white/10 shadow-lg">
-                  {card.home_flag ? (
+                  {isImageSrc(card.home_flag) ? (
                     <img src={card.home_flag} alt={card.home_name} className="max-w-full max-h-full object-contain drop-shadow" />
+                  ) : card.home_flag ? (
+                    <span className="text-3xl select-none">{card.home_flag}</span>
                   ) : (
                     <Shield className="w-10 h-10 text-emerald-400" />
                   )}
@@ -350,8 +376,10 @@ export const RenderCanvas: React.FC = () => {
               {/* Away Team */}
               <div className="col-span-2 flex flex-col items-center space-y-1.5">
                 <div className="w-18 h-18 sm:w-20 sm:h-20 rounded-2xl glass-pill flex items-center justify-center p-2.5 border border-white/10 shadow-lg">
-                  {card.away_flag ? (
+                  {isImageSrc(card.away_flag) ? (
                     <img src={card.away_flag} alt={card.away_name} className="max-w-full max-h-full object-contain drop-shadow" />
+                  ) : card.away_flag ? (
+                    <span className="text-3xl select-none">{card.away_flag}</span>
                   ) : (
                     <Shield className="w-10 h-10 text-cyan-400" />
                   )}

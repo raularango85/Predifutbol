@@ -138,7 +138,7 @@ func main() {
 	}
 	publicAudioDir := filepath.Join(publicDir, "audio")
 	audioSvc := audio.NewAudioService(ffmpegPath, publicAudioDir)
-	mediaRenderer := media.NewMediaRenderer(ffmpegPath, exportsDir, audioSvc)
+	mediaRenderer := media.NewMediaRenderer(ffmpegPath, exportsDir, audioSvc, baseDir)
 	exportUC := usecase.NewExportUsecase(mediaRenderer)
 
 	// 5. Initialize Handlers & Router

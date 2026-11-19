@@ -1,8 +1,10 @@
 package audio
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -134,12 +136,6 @@ func (s *AudioService) GenerateSpeech(ctx context.Context, text, lang, voice, ou
 	voicesToTry := append([]string{primaryVoice}, fallbackVoices...)
 	rate := "+18%"
 
-	tempTextFile := filepath.Join(os.TempDir(), fmt.Sprintf("predifutbol_tts_in_%d.txt", time.Now().UnixNano()))
-	if err := os.WriteFile(tempTextFile, []byte(text), 0644); err != nil {
-		return fmt.Errorf("audio/writeTempText: %w", err)
-	}
-	defer os.Remove(tempTextFile)
-
 	var lastErr error
 	for _, v := range voicesToTry {
 		for attempt := 1; attempt <= 2; attempt++ {
@@ -149,16 +145,20 @@ func (s *AudioService) GenerateSpeech(ctx context.Context, text, lang, voice, ou
 				"-m", "edge_tts",
 				"--voice", v,
 				"--rate", rate,
-				"--file", tempTextFile,
+				"--text", text,
 				"--write-media", outputPath,
 			)
+			cmd.Env = append(os.Environ(), "PYTHONUTF8=1", "PYTHONIOENCODING=utf-8")
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
 
 			if err := cmd.Run(); err == nil {
 				if info, statErr := os.Stat(outputPath); statErr == nil && info.Size() > 1024 {
 					return nil
 				}
 			} else {
-				lastErr = err
+				lastErr = fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+				slog.Warn("TTS generation attempt failed", slog.String("voice", v), slog.Int("attempt", attempt), slog.String("error", lastErr.Error()))
 			}
 
 			select {
@@ -184,6 +184,8 @@ func (s *AudioService) MixVideoAudioTrack(ctx context.Context, p *domain.Predict
 	hasVoice := false
 	if err := s.GenerateSpeech(ctx, text, lang, "", tempNarration); err == nil {
 		hasVoice = true
+	} else {
+		slog.Error("TTS GenerateSpeech failed; falling back to BGM only", slog.String("error", err.Error()), slog.String("text", text))
 	}
 
 	bgmCrowd := filepath.Join(s.publicAudioDir, "bgm_stadium_crowd.mp3")
