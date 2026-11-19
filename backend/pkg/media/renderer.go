@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -360,23 +361,41 @@ func (r *MediaRenderer) Render(ctx context.Context, opts ExportOptions) ([]domai
 		predCopy.LeagueLogo = &resLogo
 	}
 
-	outputFiles := make([]domain.ExportFile, 0, len(langs))
+	var (
+		mu          sync.Mutex
+		outputFiles = make([]domain.ExportFile, len(langs))
+		progressMap = make(map[string]float64)
+	)
+	for _, l := range langs {
+		progressMap[l] = 0
+	}
+
+	reportProgress := func(lang string, langPct float64, stage string, frame, totalFrames int, etaSec *int) {
+		mu.Lock()
+		defer mu.Unlock()
+		progressMap[lang] = langPct
+		var sum float64
+		for _, p := range progressMap {
+			sum += p
+		}
+		overall := sum / float64(len(langs))
+		report(overall, stage, frame, totalFrames, etaSec)
+	}
+
 	cardJSON, _ := json.Marshal(predCopy)
 	cardJSONStr := string(cardJSON)
 	encodedData := url.QueryEscape(cardJSONStr)
 
-	for langIdx, lang := range langs {
+	renderSingleLang := func(langIdx int, lang string) error {
 		langUpper := strings.ToUpper(lang)
-		langSpan := 100.0 / float64(len(langs))
-		langStart := float64(langIdx) * langSpan
-
 		targetURL := fmt.Sprintf("http://127.0.0.1:%d/render-canvas?render=1&lang=%s&data=%s",
 			opts.Port, lang, encodedData)
 
 		tabCtx, cancelTab := chromedp.NewContext(browserCtx)
+		defer cancelTab()
 
 		if opts.Format == domain.ExportFormatPNG {
-			report(langStart+langSpan*0.3, fmt.Sprintf("Generando snapshot PNG 1080x1920 (%s)...", langUpper), 0, 0, nil)
+			reportProgress(lang, 30.0, fmt.Sprintf("Generando snapshot PNG 1080x1920 (%s)...", langUpper), 0, 0, nil)
 
 			pngURL := fmt.Sprintf("%s&format=png", targetURL)
 			err := chromedp.Do(tabCtx,
@@ -403,171 +422,197 @@ func (r *MediaRenderer) Render(ctx context.Context, opts ExportOptions) ([]domai
 				chromedp.Evaluate[chromedp.Void]("window.__vtInstantFinalState && window.__vtInstantFinalState();"),
 			)
 			if err != nil {
-				cancelTab()
-				return nil, fmt.Errorf("media/navigatePNG: %w", err)
+				return fmt.Errorf("media/navigatePNG (%s): %w", lang, err)
 			}
 
 			buf, err := chromedp.Run(tabCtx, chromedp.CaptureScreenshot())
-			cancelTab()
-
 			if err != nil {
-				return nil, fmt.Errorf("media/capturePNG: %w", err)
+				return fmt.Errorf("media/capturePNG (%s): %w", lang, err)
 			}
 
 			fileName := fmt.Sprintf("%s_%s_%s_%s.png", datePrefix, matchSlug, langUpper, ts)
 			finalPath := filepath.Join(r.exportsDir, fileName)
 			if err := os.WriteFile(finalPath, buf, 0644); err != nil {
-				return nil, fmt.Errorf("media/writePNG: %w", err)
+				return fmt.Errorf("media/writePNG (%s): %w", lang, err)
 			}
 
-			outputFiles = append(outputFiles, domain.ExportFile{
+			mu.Lock()
+			outputFiles[langIdx] = domain.ExportFile{
 				Lang:     lang,
 				Format:   string(domain.ExportFormatPNG),
 				FileName: fileName,
 				URL:      fmt.Sprintf("/exports/%s", fileName),
-			})
-
-		} else {
-			// Video MP4 frame-by-frame
-			report(langStart+langSpan*0.05, fmt.Sprintf("Sintetizando banda sonora y locución IA (%s)...", langUpper), 0, 0, nil)
-
-			tempAudioPath := filepath.Join(os.TempDir(), fmt.Sprintf("predifutbol_a_%d.mp3", time.Now().UnixNano()))
-			defer os.Remove(tempAudioPath)
-
-			hasAudio, _ := r.audioService.MixVideoAudioTrack(ctx, opts.Prediction, lang, float64(r.durationSec), tempAudioPath)
-
-			totalFrames := r.fps * r.durationSec
-			frameMs := 1000.0 / float64(r.fps)
-
-			fileName := fmt.Sprintf("%s_%s_%s_%s.mp4", datePrefix, matchSlug, langUpper, ts)
-			finalPath := filepath.Join(r.exportsDir, fileName)
-			tempVideoPath := filepath.Join(os.TempDir(), fmt.Sprintf("predifutbol_v_%d.mp4", time.Now().UnixNano()))
-			defer os.Remove(tempVideoPath)
-
-			videoTarget := tempVideoPath
-			if !hasAudio {
-				videoTarget = finalPath
 			}
+			mu.Unlock()
+			reportProgress(lang, 100.0, fmt.Sprintf("PNG completado (%s)", langUpper), 0, 0, nil)
+			return nil
+		}
 
-			encoderCodec, encoderArgs := detectH264Encoder(r.ffmpegPath)
-			ffmpegArgs := []string{
-				"-y",
-				"-f", "image2pipe",
-				"-framerate", fmt.Sprintf("%d", r.fps),
-				"-c:v", "mjpeg",
-				"-i", "pipe:0",
-				"-vf", "scale=1080:1920:flags=bicubic,format=yuv420p",
-				"-c:v", encoderCodec,
-			}
-			ffmpegArgs = append(ffmpegArgs, encoderArgs...)
-			ffmpegArgs = append(ffmpegArgs,
-				"-r", fmt.Sprintf("%d", r.fps),
-				"-movflags", "+faststart",
-				videoTarget,
+		// Video MP4 frame-by-frame
+		reportProgress(lang, 5.0, fmt.Sprintf("Sintetizando banda sonora y locución IA (%s)...", langUpper), 0, 0, nil)
+
+		tempAudioPath := filepath.Join(os.TempDir(), fmt.Sprintf("predifutbol_a_%s_%d.mp3", lang, time.Now().UnixNano()))
+		defer os.Remove(tempAudioPath)
+
+		hasAudio, _ := r.audioService.MixVideoAudioTrack(ctx, opts.Prediction, lang, float64(r.durationSec), tempAudioPath)
+
+		totalFrames := r.fps * r.durationSec
+		frameMs := 1000.0 / float64(r.fps)
+
+		fileName := fmt.Sprintf("%s_%s_%s_%s.mp4", datePrefix, matchSlug, langUpper, ts)
+		finalPath := filepath.Join(r.exportsDir, fileName)
+		tempVideoPath := filepath.Join(os.TempDir(), fmt.Sprintf("predifutbol_v_%s_%d.mp4", lang, time.Now().UnixNano()))
+		defer os.Remove(tempVideoPath)
+
+		videoTarget := tempVideoPath
+		if !hasAudio {
+			videoTarget = finalPath
+		}
+
+		encoderCodec, encoderArgs := detectH264Encoder(r.ffmpegPath)
+		ffmpegArgs := []string{
+			"-y",
+			"-f", "image2pipe",
+			"-framerate", fmt.Sprintf("%d", r.fps),
+			"-c:v", "mjpeg",
+			"-i", "pipe:0",
+			"-vf", "scale=1080:1920:flags=bicubic,format=yuv420p",
+			"-c:v", encoderCodec,
+		}
+		ffmpegArgs = append(ffmpegArgs, encoderArgs...)
+		ffmpegArgs = append(ffmpegArgs,
+			"-r", fmt.Sprintf("%d", r.fps),
+			"-movflags", "+faststart",
+			videoTarget,
+		)
+
+		ffmpegCmd := exec.CommandContext(ctx, r.ffmpegPath, ffmpegArgs...)
+		var ffmpegStderr bytes.Buffer
+		ffmpegCmd.Stderr = &ffmpegStderr
+
+		ffmpegStdin, err := ffmpegCmd.StdinPipe()
+		if err != nil {
+			return fmt.Errorf("media/ffmpegStdin (%s): %w", lang, err)
+		}
+
+		if err := ffmpegCmd.Start(); err != nil {
+			return fmt.Errorf("media/ffmpegStart (%s): %w", lang, err)
+		}
+
+		renderStart := time.Now()
+
+		err = chromedp.Do(tabCtx,
+			chromedp.EmulateViewport(540, 960, chromedp.EmulateScale(2.0), chromedp.EmulatePortrait),
+			chromedp.Navigate(targetURL),
+			chromedp.Evaluate[chromedp.Void](fmt.Sprintf(`
+				window.__RENDER_CARD_DATA__ = %s;
+				if (window.__vtSetCard) { window.__vtSetCard(%s); }
+			`, cardJSONStr, cardJSONStr)),
+			chromedp.Sleep(600*time.Millisecond),
+			chromedp.Evaluate[chromedp.Void](`
+				(async () => {
+					try {
+						const imgs = Array.from(document.images);
+						await Promise.all(imgs.map(img => {
+							if (img.decode) return img.decode().catch(() => {});
+							if (img.complete) return Promise.resolve();
+							return new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 2000); });
+						}));
+					} catch (e) {}
+				})()
+			`),
+			chromedp.Sleep(200*time.Millisecond),
+			chromedp.Evaluate[chromedp.Void](virtualClockScript),
+		)
+		if err != nil {
+			_ = ffmpegStdin.Close()
+			_ = ffmpegCmd.Process.Kill()
+			return fmt.Errorf("media/navigateVideo (%s): %w", lang, err)
+		}
+
+		var frameBuf []byte
+		captureAct := captureJpegAction(86, &frameBuf)
+
+		for f := 0; f < totalFrames; f++ {
+			ms := int(float64(f) * frameMs)
+			advanceScript := fmt.Sprintf("if (window.__vtSceneAdvanceTo) { window.__vtSceneAdvanceTo(%d); } if (window.__vtAdvanceTo) { window.__vtAdvanceTo(%d); }", ms, ms)
+
+			err := chromedp.Do(tabCtx,
+				chromedp.Evaluate[chromedp.Void](advanceScript),
+				captureAct,
 			)
-
-			ffmpegCmd := exec.CommandContext(ctx, r.ffmpegPath, ffmpegArgs...)
-			var ffmpegStderr bytes.Buffer
-			ffmpegCmd.Stderr = &ffmpegStderr
-
-			ffmpegStdin, err := ffmpegCmd.StdinPipe()
 			if err != nil {
-				cancelTab()
-				return nil, fmt.Errorf("media/ffmpegStdin: %w", err)
-			}
-
-			if err := ffmpegCmd.Start(); err != nil {
-				cancelTab()
-				return nil, fmt.Errorf("media/ffmpegStart: %w", err)
-			}
-
-			renderStart := time.Now()
-
-			err = chromedp.Do(tabCtx,
-				chromedp.EmulateViewport(540, 960, chromedp.EmulateScale(2.0), chromedp.EmulatePortrait),
-				chromedp.Navigate(targetURL),
-				chromedp.Evaluate[chromedp.Void](fmt.Sprintf(`
-					window.__RENDER_CARD_DATA__ = %s;
-					if (window.__vtSetCard) { window.__vtSetCard(%s); }
-				`, cardJSONStr, cardJSONStr)),
-				chromedp.Sleep(600*time.Millisecond),
-				chromedp.Evaluate[chromedp.Void](`
-					(async () => {
-						try {
-							const imgs = Array.from(document.images);
-							await Promise.all(imgs.map(img => {
-								if (img.decode) return img.decode().catch(() => {});
-								if (img.complete) return Promise.resolve();
-								return new Promise(r => { img.onload = img.onerror = r; setTimeout(r, 2000); });
-							}));
-						} catch (e) {}
-					})()
-				`),
-				chromedp.Sleep(200*time.Millisecond),
-				chromedp.Evaluate[chromedp.Void](virtualClockScript),
-			)
-			if err != nil {
-				cancelTab()
 				_ = ffmpegStdin.Close()
 				_ = ffmpegCmd.Process.Kill()
-				return nil, fmt.Errorf("media/navigateVideo: %w", err)
+				return fmt.Errorf("media/captureFrame %d (%s): %w", f, lang, err)
 			}
 
-			var frameBuf []byte
-			captureAct := captureJpegAction(86, &frameBuf)
+			if _, err := ffmpegStdin.Write(frameBuf); err != nil {
+				_ = ffmpegStdin.Close()
+				return fmt.Errorf("media/writeFramePipe %d (%s): %w | stderr: %s", f, lang, err, ffmpegStderr.String())
+			}
 
-			for f := 0; f < totalFrames; f++ {
-				ms := int(float64(f) * frameMs)
-				advanceScript := fmt.Sprintf("if (window.__vtSceneAdvanceTo) { window.__vtSceneAdvanceTo(%d); } if (window.__vtAdvanceTo) { window.__vtAdvanceTo(%d); }", ms, ms)
+			elapsed := time.Since(renderStart).Seconds()
+			eta := int((elapsed / float64(f+1)) * float64(totalFrames-f-1))
+			fraction := float64(f+1) / float64(totalFrames)
 
-				err := chromedp.Do(tabCtx,
-					chromedp.Evaluate[chromedp.Void](advanceScript),
-					captureAct,
-				)
-				if err != nil {
-					_ = ffmpegStdin.Close()
-					_ = ffmpegCmd.Process.Kill()
-					cancelTab()
-					return nil, fmt.Errorf("media/captureFrame %d: %w", f, err)
+			reportProgress(
+				lang,
+				6.0+90.0*fraction,
+				fmt.Sprintf("Renderizando fotograma %d de %d (%s) [%s GPU]", f+1, totalFrames, langUpper, strings.ToUpper(encoderCodec)),
+				f+1, totalFrames, &eta,
+			)
+		}
+
+		_ = ffmpegStdin.Close()
+		if err := ffmpegCmd.Wait(); err != nil {
+			return fmt.Errorf("media/ffmpegWait (%s): %w | stderr: %s", lang, err, ffmpegStderr.String())
+		}
+
+		if hasAudio {
+			reportProgress(lang, 98.0, fmt.Sprintf("Mezclando video y audio estéreo (%s)...", langUpper), totalFrames, totalFrames, nil)
+			if err := r.audioService.MuxVideoAndAudio(ctx, tempVideoPath, tempAudioPath, finalPath); err != nil {
+				_ = os.Rename(tempVideoPath, finalPath)
+			}
+		}
+
+		mu.Lock()
+		outputFiles[langIdx] = domain.ExportFile{
+			Lang:     lang,
+			Format:   string(domain.ExportFormatVideo),
+			FileName: fileName,
+			URL:      fmt.Sprintf("/exports/%s", fileName),
+		}
+		mu.Unlock()
+		reportProgress(lang, 100.0, fmt.Sprintf("Video completado (%s)", langUpper), totalFrames, totalFrames, nil)
+		return nil
+	}
+
+	if len(langs) == 1 {
+		if err := renderSingleLang(0, langs[0]); err != nil {
+			return nil, err
+		}
+	} else {
+		var wg sync.WaitGroup
+		errChan := make(chan error, len(langs))
+
+		for i, l := range langs {
+			wg.Add(1)
+			go func(idx int, targetLang string) {
+				defer wg.Done()
+				if err := renderSingleLang(idx, targetLang); err != nil {
+					errChan <- err
 				}
+			}(i, l)
+		}
 
-				if _, err := ffmpegStdin.Write(frameBuf); err != nil {
-					_ = ffmpegStdin.Close()
-					cancelTab()
-					return nil, fmt.Errorf("media/writeFramePipe %d: %w | stderr: %s", f, err, ffmpegStderr.String())
-				}
+		wg.Wait()
+		close(errChan)
 
-				elapsed := time.Since(renderStart).Seconds()
-				eta := int((elapsed / float64(f+1)) * float64(totalFrames-f-1))
-				fraction := float64(f+1) / float64(totalFrames)
-
-				report(
-					langStart+langSpan*(0.06+0.90*fraction),
-					fmt.Sprintf("Renderizando fotograma %d de %d (%s) [%s GPU]", f+1, totalFrames, langUpper, strings.ToUpper(encoderCodec)),
-					f+1, totalFrames, &eta,
-				)
+		for err := range errChan {
+			if err != nil {
+				return nil, err
 			}
-
-			_ = ffmpegStdin.Close()
-			if err := ffmpegCmd.Wait(); err != nil {
-				cancelTab()
-				return nil, fmt.Errorf("media/ffmpegWait: %w | stderr: %s", err, ffmpegStderr.String())
-			}
-			cancelTab()
-
-			if hasAudio {
-				report(langStart+langSpan*0.98, fmt.Sprintf("Mezclando video y audio estéreo (%s)...", langUpper), totalFrames, totalFrames, nil)
-				if err := r.audioService.MuxVideoAndAudio(ctx, tempVideoPath, tempAudioPath, finalPath); err != nil {
-					_ = os.Rename(tempVideoPath, finalPath)
-				}
-			}
-
-			outputFiles = append(outputFiles, domain.ExportFile{
-				Lang:     lang,
-				Format:   string(domain.ExportFormatVideo),
-				FileName: fileName,
-				URL:      fmt.Sprintf("/exports/%s", fileName),
-			})
 		}
 	}
 
