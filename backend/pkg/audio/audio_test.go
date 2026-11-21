@@ -42,7 +42,7 @@ func TestBuildNarrationText(t *testing.T) {
 	if !strings.Contains(textES, "Gana Local") {
 		t.Errorf("expected Spanish text to have pick, got: %s", textES)
 	}
-	if !strings.Contains(textES, "1 punto 85") {
+	if !strings.Contains(textES, "uno punto ochenta y cinco") {
 		t.Errorf("expected Spanish text to have spoken odd, got: %s", textES)
 	}
 
@@ -53,7 +53,51 @@ func TestBuildNarrationText(t *testing.T) {
 	if !strings.Contains(textEN, "Home Win") {
 		t.Errorf("expected English text to have pick, got: %s", textEN)
 	}
-	if !strings.Contains(textEN, "1 point 85") {
+	if !strings.Contains(textEN, "one point eighty-five") {
 		t.Errorf("expected English text to have spoken odd, got: %s", textEN)
+	}
+}
+
+func TestFormatPickForSpeech(t *testing.T) {
+	tests := []struct {
+		input    string
+		lang     string
+		expected string
+	}{
+		{"Más de 6 5 tarjetas", "es", "Más de seis punto cinco tarjetas"},
+		{"Más de 6.5 tarjetas", "es", "Más de seis punto cinco tarjetas"},
+		{"Más de 2.5 Goles", "es", "Más de dos punto cinco Goles"},
+		{"Menos de 3.5 Córners", "es", "Menos de tres punto cinco Córners"},
+		{"Over 2.5 Goals", "en", "Over two point five Goals"},
+		{"Over 6 5 Cards", "en", "Over six point five Cards"},
+	}
+
+	for _, tt := range tests {
+		actual := audio.FormatPickForSpeech(tt.input, tt.lang)
+		if actual != tt.expected {
+			t.Errorf("FormatPickForSpeech(%q, %q) = %q; want %q", tt.input, tt.lang, actual, tt.expected)
+		}
+	}
+}
+
+func TestFormatOddForSpeech(t *testing.T) {
+	tests := []struct {
+		odd      float64
+		lang     string
+		expected string
+	}{
+		{1.90, "es", "uno punto noventa"},
+		{1.85, "es", "uno punto ochenta y cinco"},
+		{2.10, "es", "dos punto diez"},
+		{1.90, "en", "one point ninety"},
+		{2.00, "es", "dos"},
+		{2.05, "es", "dos punto cero cinco"},
+	}
+
+	for _, tt := range tests {
+		actual := audio.FormatOddForSpeech(tt.odd, tt.lang)
+		if actual != tt.expected {
+			t.Errorf("FormatOddForSpeech(%.2f, %q) = %q; want %q", tt.odd, tt.lang, actual, tt.expected)
+		}
 	}
 }

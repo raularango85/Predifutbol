@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,6 +44,143 @@ func NewAudioService(ffmpegPath, publicAudioDir string) *AudioService {
 
 var emojiRegex = regexp.MustCompile(`[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}•|#⚡🔥🛡️⚽🔔📢🎯]`)
 var spacesRegex = regexp.MustCompile(`\s+`)
+var spaceDecimalRegex = regexp.MustCompile(`(?i)\b(m[aá]s\s+de|menos\s+de|over|under)\s+(\d+)\s+(\d+)\b`)
+var decimalRegex = regexp.MustCompile(`\b(\d+)[.,](\d+)\b`)
+
+var unitsES = map[int]string{
+	0: "cero", 1: "uno", 2: "dos", 3: "tres", 4: "cuatro",
+	5: "cinco", 6: "seis", 7: "siete", 8: "ocho", 9: "nueve",
+	10: "diez", 11: "once", 12: "doce", 13: "trece", 14: "catorce",
+	15: "quince", 16: "dieciséis", 17: "diecisiete", 18: "dieciocho", 19: "diecinueve",
+	20: "veinte", 21: "veintiuno", 22: "veintidós", 23: "veintitrés", 24: "veinticuatro",
+	25: "veinticinco", 26: "veintiséis", 27: "veintisiete", 28: "veintiocho", 29: "veintinueve",
+}
+
+var tensES = map[int]string{
+	30: "treinta", 40: "cuarenta", 50: "cincuenta", 60: "sesenta",
+	70: "setenta", 80: "ochenta", 90: "noventa",
+}
+
+var unitsEN = map[int]string{
+	0: "zero", 1: "one", 2: "two", 3: "three", 4: "four",
+	5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine",
+	10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen",
+	15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
+	20: "twenty",
+}
+
+var tensEN = map[int]string{
+	30: "thirty", 40: "forty", 50: "fifty", 60: "sixty",
+	70: "seventy", 80: "eighty", 90: "ninety",
+}
+
+func NumberToWords(n int, lang string) string {
+	if lang == "es" {
+		if n < 0 {
+			return fmt.Sprintf("menos %s", NumberToWords(-n, lang))
+		}
+		if str, ok := unitsES[n]; ok {
+			return str
+		}
+		if n < 100 {
+			ten := (n / 10) * 10
+			unit := n % 10
+			if unit == 0 {
+				return tensES[ten]
+			}
+			return fmt.Sprintf("%s y %s", tensES[ten], unitsES[unit])
+		}
+		return fmt.Sprintf("%d", n)
+	}
+
+	// English
+	if n < 0 {
+		return fmt.Sprintf("minus %s", NumberToWords(-n, lang))
+	}
+	if str, ok := unitsEN[n]; ok {
+		return str
+	}
+	if n < 100 {
+		ten := (n / 10) * 10
+		unit := n % 10
+		if unit == 0 {
+			return tensEN[ten]
+		}
+		return fmt.Sprintf("%s-%s", tensEN[ten], unitsEN[unit])
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+func FormatOddForSpeech(odd float64, lang string) string {
+	if odd <= 0 {
+		odd = 1.75
+	}
+	if lang == "es" {
+		intPart := int(odd)
+		decPart := int(math.Round((odd - float64(intPart)) * 100))
+		intStr := NumberToWords(intPart, "es")
+		decStr := NumberToWords(decPart, "es")
+		if decPart < 10 && decPart > 0 {
+			decStr = fmt.Sprintf("cero %s", unitsES[decPart])
+		} else if decPart == 0 {
+			return intStr
+		}
+		return fmt.Sprintf("%s punto %s", intStr, decStr)
+	}
+
+	intPart := int(odd)
+	decPart := int(math.Round((odd - float64(intPart)) * 100))
+	intStr := NumberToWords(intPart, "en")
+	decStr := NumberToWords(decPart, "en")
+	if decPart == 0 {
+		return intStr
+	}
+	return fmt.Sprintf("%s point %s", intStr, decStr)
+}
+
+func FormatPickForSpeech(pick string, lang string) string {
+	cleaned := CleanForSpeech(pick)
+	if cleaned == "" {
+		return cleaned
+	}
+
+	isEs := lang == "es"
+
+	// 1. Handle space-separated decimals in betting lines, e.g. "Más de 6 5 tarjetas" -> "Más de seis punto cinco tarjetas"
+	cleaned = spaceDecimalRegex.ReplaceAllStringFunc(cleaned, func(match string) string {
+		parts := spaceDecimalRegex.FindStringSubmatch(match)
+		if len(parts) == 4 {
+			prefix := parts[1]
+			d1, err1 := strconv.Atoi(parts[2])
+			d2, err2 := strconv.Atoi(parts[3])
+			if err1 == nil && err2 == nil {
+				if isEs {
+					return fmt.Sprintf("%s %s punto %s", prefix, NumberToWords(d1, "es"), NumberToWords(d2, "es"))
+				}
+				return fmt.Sprintf("%s %s point %s", prefix, NumberToWords(d1, "en"), NumberToWords(d2, "en"))
+			}
+		}
+		return match
+	})
+
+	// 2. Handle standard decimals e.g. "6.5", "6,5", "2.5" -> "seis punto cinco", "dos punto cinco"
+	cleaned = decimalRegex.ReplaceAllStringFunc(cleaned, func(match string) string {
+		parts := decimalRegex.FindStringSubmatch(match)
+		if len(parts) == 3 {
+			d1, err1 := strconv.Atoi(parts[1])
+			d2, err2 := strconv.Atoi(parts[2])
+			if err1 == nil && err2 == nil {
+				if isEs {
+					return fmt.Sprintf("%s punto %s", NumberToWords(d1, "es"), NumberToWords(d2, "es"))
+				}
+				return fmt.Sprintf("%s point %s", NumberToWords(d1, "en"), NumberToWords(d2, "en"))
+			}
+		}
+		return match
+	})
+
+	return cleaned
+}
 
 func CleanForSpeech(str string) string {
 	clean := emojiRegex.ReplaceAllString(str, "")
@@ -80,7 +218,7 @@ func (s *AudioService) BuildNarrationText(p *domain.Prediction, lang string) str
 			rawPick = formatted.EN
 		}
 	}
-	pick := CleanForSpeech(rawPick)
+	pick := FormatPickForSpeech(rawPick, lang)
 	if pick == "" {
 		if isEs {
 			pick = "Victoria Local"
@@ -89,15 +227,7 @@ func (s *AudioService) BuildNarrationText(p *domain.Prediction, lang string) str
 		}
 	}
 
-	odd := p.Odd
-	if odd <= 0 {
-		odd = 1.75
-	}
-	pointWord := " punto "
-	if !isEs {
-		pointWord = " point "
-	}
-	oddStr := strings.ReplaceAll(fmt.Sprintf("%.2f", odd), ".", pointWord)
+	oddStr := FormatOddForSpeech(p.Odd, lang)
 
 	prob := p.Probability
 	if prob <= 0 {
@@ -106,13 +236,13 @@ func (s *AudioService) BuildNarrationText(p *domain.Prediction, lang string) str
 
 	if isEs {
 		return fmt.Sprintf(
-			"¡%s recibe a %s! Nuestra predicción de valor: %s, a cuota %s y %d por ciento de probabilidad. ¡Síguenos en TikTok... ¡Somos PrediFutbol Colombia!",
+			"¡%s recibe a %s! Nuestra predicción de valor: %s, a cuota %s, con %d por ciento de probabilidad. ¡Síguenos en TikTok! ¡Somos PrediFutbol Colombia!",
 			home, away, pick, oddStr, prob,
 		)
 	}
 
 	return fmt.Sprintf(
-		"¡%s takes on %s! Our top value pick: %s, at odds %s with %d percent confidence. Follow us on TikTok... We are PrediFutbol Colombia!",
+		"¡%s takes on %s! Our top value pick: %s, at odds %s, with %d percent confidence. Follow us on TikTok! We are PrediFutbol Colombia!",
 		home, away, pick, oddStr, prob,
 	)
 }
@@ -134,7 +264,7 @@ func (s *AudioService) GenerateSpeech(ctx context.Context, text, lang, voice, ou
 	}
 
 	voicesToTry := append([]string{primaryVoice}, fallbackVoices...)
-	rate := "+18%"
+	rate := "+10%"
 
 	var lastErr error
 	for _, v := range voicesToTry {
@@ -218,7 +348,7 @@ func (s *AudioService) MixVideoAudioTrack(ctx context.Context, p *domain.Predict
 		// [2:a] Whoosh at t=0s
 		// [3:a] Ding at t=5.5s
 		filterComplex := fmt.Sprintf(
-			"[0:a]adelay=400|400,volume=2.6[vox];"+
+			"[0:a]adelay=200|200,volume=2.6[vox];"+
 				"[1:a]%s;"+
 				"[2:a]volume=0.9[whoosh];"+
 				"[3:a]adelay=5500|5500,volume=1.4[ding];"+
